@@ -1,0 +1,24 @@
+# ── OpenClaw 项目级配置 ──
+# 优先级: env vars > config.local.yaml > config.yaml > code defaults
+# 敏感信息 (API keys) 请放在 config.local.yaml 或 env vars 中
+
+redis:
+  url: "redis://127.0.0.1:6379/0"
+
+llm:
+  daily_budget_yuan: 50.0
+  max_system_prompt_chars: 12000
+  max_user_input_chars: 8000
+  max_context_chars: 6000
+
+orchestrator:
+  session_compaction_threshold: 24
+  session_compaction_keep_recent: 8
+  circuit_breaker_threshold: 5
+  circuit_breaker_cooldown_s: 60
+  l2_max_steps: 6
+  l2_max_parallel_batch: 4
+
+webchat:
+  host: "0.0.0.0"
+  port: 7789

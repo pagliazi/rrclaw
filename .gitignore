@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv*/
+venv/
+
+# IDEs
+.vscode/
+.idea/
+
+# Secrets
+*.env
+.env
+config.local.yaml
+secrets.env
+
+# OS
+.DS_Store
+
+# Runtime
+logs/
+.pids/
+memory/chroma/
+memory/embed_cache/
+memory/graph/
+
+# Claude
+.claude/
