@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.hermes-bridge</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/hermes-openclaw-bridge/.venv/bin/python</string>
+    <string>-m</string>
+    <string>bridge.server</string>
+    <string>--config</string>
+    <string>bridge.yaml</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/opt/hermes-openclaw-bridge</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>REDIS_URL</key>
+    <string>redis://127.0.0.1:6379/0</string>
+    <key>GATEWAY_URL</key>
+    <string>ws://127.0.0.1:18789</string>
+    <key>HERMES_AGENT_PATH</key>
+    <string>/opt/hermes-agent</string>
+  </dict>
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/var/log/hermes-bridge.log</string>
+  <key>StandardErrorPath</key>
+  <string>/var/log/hermes-bridge.err</string>
+</dict>
+</plist>

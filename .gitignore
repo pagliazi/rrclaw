@@ -21,6 +21,7 @@ venv/
 *.env
 .env
 config.local.yaml
+bridge.yaml
 secrets.env
 
 # OS

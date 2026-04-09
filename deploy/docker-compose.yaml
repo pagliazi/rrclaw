@@ -1,0 +1,64 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+  openclaw:
+    image: ghcr.io/openclaw/openclaw:latest
+    ports:
+      - "18789:18789"
+    environment:
+      - OPENCLAW_GATEWAY_HOST=0.0.0.0
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - openclaw_data:/root/.openclaw
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  hermes-agent:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.hermes
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - HERMES_MODEL=${HERMES_MODEL:-}
+      - HERMES_PROVIDER=${HERMES_PROVIDER:-}
+    volumes:
+      - hermes_data:/root/.hermes
+      - ./toolsets:/app/toolsets
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  bridge:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - GATEWAY_URL=ws://openclaw:18789
+      - GATEWAY_TOKEN=${GATEWAY_TOKEN:-}
+      - HERMES_AGENT_PATH=/hermes-agent
+      - HERMES_MODEL=${HERMES_MODEL:-}
+      - HERMES_PROVIDER=${HERMES_PROVIDER:-}
+    volumes:
+      - hermes_data:/root/.hermes
+      - openclaw_data:/root/.openclaw
+    depends_on:
+      - redis
+      - openclaw
+      - hermes-agent
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  openclaw_data:
+  hermes_data:

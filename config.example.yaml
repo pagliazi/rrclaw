@@ -1,0 +1,52 @@
+# Hermes-OpenClaw Bridge Configuration
+# Copy to bridge.yaml and customize for your environment.
+# Environment variables override YAML values.
+
+gateway:
+  # OpenClaw Gateway WebSocket URL
+  # Override: GATEWAY_URL env var
+  url: "ws://127.0.0.1:18789"
+
+  # Gateway authentication token (optional)
+  # Override: GATEWAY_TOKEN env var
+  auth_token: ""
+
+hermes:
+  # LLM model for Hermes agent
+  # Override: HERMES_MODEL env var
+  # Examples: gpt-4o, claude-sonnet-4-20250514, qwen3-max, deepseek-chat
+  model: ""
+
+  # LLM provider (auto-detected from model if empty)
+  # Override: HERMES_PROVIDER env var
+  # Options: openai, anthropic, custom, ollama, openrouter, ...
+  provider: ""
+
+  # Custom provider base URL (for custom/self-hosted models)
+  base_url: ""
+
+  # Hermes profile name (isolates config, skills, memory)
+  profile: "bridge"
+
+  # Max parallel Hermes agent instances
+  max_workers: 4
+
+  # Default toolsets enabled for bridge tasks
+  # Options: core, web, terminal, browser, media, delegation, automation
+  default_toolsets:
+    - core
+    - web
+    - terminal
+    - browser
+
+redis:
+  # Redis connection URL (shared between both systems)
+  # Override: REDIS_URL env var
+  url: "redis://127.0.0.1:6379/0"
+
+skills:
+  # Auto-sync skills between Hermes and OpenClaw
+  auto_sync: true
+
+  # Sync interval in hours
+  sync_interval_hours: 6
