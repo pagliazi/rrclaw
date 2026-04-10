@@ -2,24 +2,37 @@
 
 # RRCLAW
 
-**Unified Agent Harness for A-Share Quantitative Trading**
+**Multi-Agent AI Harness for A-Share Quantitative Trading**
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![Redis](https://img.shields.io/badge/Redis-Pub%2FSub-red.svg)](https://redis.io)
 [![Anthropic](https://img.shields.io/badge/Anthropic-Claude-purple.svg)](https://anthropic.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-*RRCLAW (ReachRich Claw) is a harness-engineered agent platform that fuses [Hermes Agent](https://github.com/NousResearch/hermes-agent), [OpenClaw](https://github.com/openclaw/openclaw), [Claude Code](https://github.com/anthropics/claude-code), and [claw-code](https://github.com/anthropics/claw-code) architectural patterns into a self-learning A-share quantitative analysis system.*
+*RRCLAW (ReachRich Claw) is a production-grade multi-agent system for **China A-share quantitative trading**. It orchestrates LLM-powered agents to perform real-time market analysis, strategy backtesting, factor mining, and automated trading signal generation — with a self-evolving architecture that learns from every decision.*
 
-[Architecture](#architecture) | [Quick Start](#quick-start) | [Modules](#module-reference) | [Deployment](#deployment) | [Testing](#testing)
+[Features](#features) | [Quick Start](#quick-start) | [Architecture](#architecture) | [Usage](#usage) | [API](#reachrich-api-integration) | [Deployment](#deployment)
 
 </div>
 
 ---
 
+## Features
+
+- **Real-time Market Data** — live quotes, limit-up/down boards, sector rotation, hot stocks, sentiment radar for 5000+ A-share stocks
+- **Strategy Backtesting** — backtrader/vectorbt dual-engine sandbox with PBO cross-validation
+- **Factor Mining** — automated alpha factor discovery via core_engine with walk-forward optimization
+- **DSL Stock Screener** — multi-condition screening across 200+ technical/sentiment/fundamental factors
+- **Self-Evolution** — GEPA pipeline (Generate → Evaluate → Promote → Archive) automatically improves prompts and strategies
+- **7-Layer Fault Tolerance** — retry → circuit breaker → recovery recipes → provider fallback → death spiral prevention
+- **Multi-Channel** — Telegram, WeChat, Feishu, WebChat, API — all channels share the same intelligent core
+- **API Key Authentication** — secure `rk_` Bearer token auth for external service integration
+
+---
+
 ## What Is RRCLAW
 
-RRCLAW is not a bridge or a plugin — it is the **brain** that controls all decisions. Unlike a traditional message translator, RRCLAW owns the LLM loop, manages context compression, executes tools, handles fault recovery, and learns from its own mistakes.
+RRCLAW is the **brain** of the quantitative trading system — not a bridge or plugin. It owns the LLM loop, manages context compression, executes tools, handles fault recovery, and learns from its own mistakes.
 
 ### Key Capabilities
 
@@ -120,7 +133,22 @@ pip install -e ".[dev]"
 
 ```bash
 cp config.example.yaml rrclaw.yaml
-# Edit rrclaw.yaml with your API keys and Redis URL
+cp .env.example .env
+```
+
+Edit `.env` with your credentials:
+
+```env
+# LLM Provider (pick one or more)
+ANTHROPIC_API_KEY=sk-ant-...
+# or DASHSCOPE_API_KEY=sk-...
+
+# ReachRich Market Data API
+REACHRICH_URL=https://rr.zayl.net/api        # Public API
+REACHRICH_TOKEN=rk_your_api_key_here          # Get from ReachRich Settings → API Key
+
+# Redis
+REDIS_URL=redis://127.0.0.1:6379/0
 ```
 
 ### Run
@@ -145,7 +173,92 @@ redis-cli PING
 
 # Monitor tool executions
 redis-cli SUBSCRIBE "harness:executions"
+
+# Test ReachRich API connection
+curl -H "Authorization: Bearer $REACHRICH_TOKEN" https://rr.zayl.net/api/bridge/snapshot/
 ```
+
+---
+
+## Usage
+
+### Natural Language Quantitative Analysis
+
+RRCLAW understands natural language commands for market analysis:
+
+```
+User: "今天涨停板有哪些半导体？"
+RRCLAW → calls market_query(type="limitup")
+       → filters by sector="半导体"
+       → "今天有3只半导体涨停: ..."
+
+User: "帮我回测一个突破20日均线的策略"
+RRCLAW → generates strategy code
+       → calls backtest/run (vectorbt engine)
+       → returns PnL curve, Sharpe ratio, max drawdown
+
+User: "用pct_chg > 5 AND volume_ratio > 3筛选股票"
+RRCLAW → calls DSL screener
+       → returns matching stocks with fundamentals
+```
+
+### Programmatic API Access
+
+Use your API Key to call ReachRich data directly:
+
+```python
+import httpx
+
+headers = {"Authorization": "Bearer rk_your_api_key"}
+base = "https://rr.zayl.net/api"
+
+# Real-time market snapshot (5000+ stocks)
+r = httpx.get(f"{base}/fast/realtime/", headers=headers)
+
+# Limit-up board analysis
+r = httpx.get(f"{base}/bridge/limitup/", headers=headers)
+
+# DSL stock screening
+r = httpx.post(f"{base}/bridge/screener/", headers=headers, json={
+    "payload": {"rules": [{"field": "pct_chg", "op": ">", "value": 5}]},
+    "limit": 20
+})
+
+# Strategy backtesting
+r = httpx.post(f"{base}/bridge/backtest/run/", headers=headers, json={
+    "strategy_code": "your_backtrader_code",
+    "stock": "000001.SZ",
+    "start_date": "2025-01-01",
+    "end_date": "2026-01-01"
+})
+```
+
+---
+
+## ReachRich API Integration
+
+RRCLAW connects to [ReachRich](https://rr.zayl.net) for A-share market data via authenticated API:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/bridge/snapshot/` | GET | Full market snapshot (5000+ stocks) |
+| `/bridge/limitup/` | GET | Limit-up/down board with sector analysis |
+| `/bridge/dragon-tiger/` | GET | Dragon-tiger list (institutional flow) |
+| `/bridge/concepts/` | GET | Sector/concept board rankings |
+| `/bridge/sentiment/` | GET | Market sentiment & news digest |
+| `/bridge/kline/` | GET | K-line data (daily/weekly/monthly) |
+| `/bridge/indicators/` | GET | Technical indicators (MA/MACD/RSI/BOLL) |
+| `/bridge/presets/` | GET | 200+ pre-built screening strategies |
+| `/bridge/screener/` | POST | DSL-based multi-factor stock screening |
+| `/bridge/backtest/run/` | POST | Strategy backtesting (backtrader/vectorbt) |
+| `/bridge/backtest/run_alpha/` | POST | Alpha factor backtesting |
+| `/bridge/backtest/run_mining/` | POST | Automated factor mining |
+| `/bridge/ledger/` | GET | AI strategy decision ledger |
+| `/bridge/llm/config/` | GET | LLM model routing configuration |
+| `/fast/realtime/` | GET | Real-time quotes (sub-second updates) |
+| `/sse/realtime/` | GET | Server-Sent Events live stream |
+
+**Authentication**: `Authorization: Bearer rk_your_api_key` — generate your key at ReachRich Settings → API Key.
 
 ---
 
