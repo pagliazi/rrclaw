@@ -23,6 +23,7 @@ venv/
 config.local.yaml
 bridge.yaml
 secrets.env
+credentials.json
 
 # OS
 .DS_Store
@@ -34,5 +35,16 @@ memory/chroma/
 memory/embed_cache/
 memory/graph/
 
+# RRCLAW runtime data
+sessions/
+traces/
+experiments/
+
 # Claude
 .claude/
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.p12

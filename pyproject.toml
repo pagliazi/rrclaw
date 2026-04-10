@@ -1,7 +1,7 @@
 [project]
-name = "hermes-openclaw-bridge"
+name = "rrclaw"
 version = "0.1.0"
-description = "Bidirectional bridge between Hermes AI Agent and OpenClaw Gateway"
+description = "RRCLAW — unified AI agent harness for A-share quantitative trading"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
@@ -14,9 +14,12 @@ keywords = [
     "hermes-agent",
     "openclaw",
     "redis",
-    "bridge",
+    "harness",
     "tool-calling",
     "agentic-ai",
+    "quantitative-trading",
+    "a-share",
+    "self-learning",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -31,6 +34,8 @@ dependencies = [
     "websockets>=12.0",
     "pyyaml>=6.0",
     "python-dotenv>=1.0",
+    "anthropic>=0.39",
+    "aiohttp>=3.9",
 ]
 
 [project.optional-dependencies]
@@ -39,15 +44,39 @@ dev = [
     "pytest-asyncio>=0.23",
     "ruff>=0.4",
 ]
+dashscope = [
+    "openai>=1.0",
+]
+full = [
+    "openai>=1.0",
+    "aiohttp>=3.9",
+]
 
 [project.scripts]
-hermes-openclaw-bridge = "bridge.server:main"
+rrclaw = "rrclaw.__main__:main"
+rrclaw-mcp = "rrclaw.tools.mcp.server:main"
+rrclaw-market = "rrclaw.tools.mcp.reachrich_server:main"
 
 [project.urls]
-Homepage = "https://github.com/pagliazi/hermes-openclaw-bridge"
-Repository = "https://github.com/pagliazi/hermes-openclaw-bridge"
-Issues = "https://github.com/pagliazi/hermes-openclaw-bridge/issues"
+Homepage = "https://github.com/pagliazi/rrclaw"
+Repository = "https://github.com/pagliazi/rrclaw"
+Issues = "https://github.com/pagliazi/rrclaw/issues"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["rrclaw"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
