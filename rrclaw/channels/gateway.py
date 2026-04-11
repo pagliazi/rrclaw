@@ -1,8 +1,13 @@
 """
-OpenClaw Gateway Channel — WebSocket connection for message routing.
+OpenClaw Gateway Channel — WebSocket connection using v3 protocol.
 
 Refactored from bridge/gateway_client.py to work with ConversationRuntime.
 Gateway is now a pure channel layer; RRCLAW controls the LLM loop.
+
+v3 protocol handshake:
+1. Receive `connect.challenge` event with nonce
+2. Send connect request with auth token and protocol version
+3. Receive connect response confirming protocol 3
 """
 
 from __future__ import annotations
@@ -10,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 from typing import Any, Callable, Optional
 
 import websockets
@@ -20,7 +26,7 @@ logger = logging.getLogger("rrclaw.channels.gateway")
 
 class GatewayChannel:
     """
-    WebSocket client for OpenClaw Gateway.
+    WebSocket client for OpenClaw Gateway (v3 protocol).
 
     In the new architecture, Gateway only routes messages.
     RRCLAW's ConversationRuntime handles all agent logic.
@@ -42,45 +48,65 @@ class GatewayChannel:
         self._reconnect_delay = 5.0
         self._max_reconnect_delay = 60.0
         self._should_run = True
+        self._req_counter = 0
+
+    def _next_req_id(self) -> str:
+        self._req_counter += 1
+        return f"req-{self._req_counter}"
 
     async def connect(self):
-        """Connect and register as RRCLAW agent."""
-        headers = {}
-        if self.auth_token:
-            headers["Authorization"] = f"Bearer {self.auth_token}"
-
+        """Connect to Gateway and perform v3 handshake."""
         try:
             self._ws = await websockets.connect(
                 self.gateway_url,
-                additional_headers=headers,
                 ping_interval=20,
                 ping_timeout=10,
             )
-            # Register as RRCLAW harness (not just a bridge)
+
+            # Step 1: Wait for connect.challenge
+            raw = await asyncio.wait_for(self._ws.recv(), timeout=10)
+            challenge = json.loads(raw)
+            if challenge.get("type") == "event" and challenge.get("event") == "connect.challenge":
+                logger.debug(f"Received connect.challenge, nonce={challenge.get('payload', {}).get('nonce', '?')}")
+            else:
+                logger.warning(f"Expected connect.challenge, got: {challenge}")
+
+            # Step 2: Send connect request (v3)
+            req_id = self._next_req_id()
             await self._send({
-                "type": "channel.register",
-                "channel": self.agent_id,
-                "capabilities": [
-                    "tool_calling",
-                    "code_execution",
-                    "web_search",
-                    "file_operations",
-                    "skill_learning",
-                    "browser_automation",
-                    "delegation",
-                    "self_learning",
-                    "context_compression",
-                    "multi_provider",
-                ],
-                "metadata": {
-                    "runtime": "rrclaw-harness",
-                    "version": "0.1.0",
-                    "architecture": "conversation_runtime",
+                "type": "req",
+                "id": req_id,
+                "method": "connect",
+                "params": {
+                    "auth": {
+                        "token": self.auth_token,
+                    },
+                    "minProtocol": 3,
+                    "maxProtocol": 3,
+                    "client": {
+                        "id": "gateway-client",
+                        "version": "0.1.0",
+                        "platform": "python",
+                        "mode": "backend",
+                    },
                 },
             })
+
+            # Step 3: Wait for connect response
+            raw = await asyncio.wait_for(self._ws.recv(), timeout=10)
+            res = json.loads(raw)
+            if res.get("type") == "res" and res.get("ok"):
+                protocol = res.get("payload", {}).get("protocol", "?")
+                logger.info(f"Gateway v3 handshake OK (protocol={protocol})")
+            else:
+                error = res.get("error", res)
+                logger.error(f"Gateway handshake failed: {error}")
+                raise ConnectionError(f"Gateway handshake failed: {error}")
+
             self._connected.set()
             self._reconnect_delay = 5.0
             logger.info(f"Connected to Gateway: {self.gateway_url}")
+
         except Exception as e:
             logger.error(f"Gateway connection failed: {e}")
             raise
@@ -117,60 +143,99 @@ class GatewayChannel:
                 )
 
     async def _dispatch(self, frame: dict):
-        """Route incoming Gateway frames to handlers."""
+        """Route incoming Gateway v3 frames to handlers."""
         frame_type = frame.get("type", "")
 
-        if frame_type == "agent.delegate":
-            if self.on_user_message:
-                await self.on_user_message(
-                    session_id=frame.get("sessionId", ""),
-                    prompt=frame.get("prompt", ""),
-                    context=frame.get("context", {}),
-                    metadata=frame.get("metadata", {}),
-                )
+        if frame_type == "event":
+            event_name = frame.get("event", "")
+            payload = frame.get("payload", {})
 
-        elif frame_type == "user.message":
-            if self.on_user_message:
-                await self.on_user_message(
-                    session_id=frame.get("sessionId", ""),
-                    prompt=frame.get("content", ""),
-                    context=frame.get("context", {}),
-                    metadata=frame.get("metadata", {}),
-                )
+            if event_name == "chat.send" or event_name == "chat":
+                # Incoming user message
+                if self.on_user_message:
+                    session_id = payload.get("sessionId", payload.get("session_id", ""))
+                    text = payload.get("text", payload.get("content", payload.get("prompt", "")))
+                    await self.on_user_message(
+                        session_id=session_id,
+                        text=text,
+                    )
 
-        elif frame_type in ("channel.ack", "heartbeat", "pong"):
-            pass  # internal
+            elif event_name in ("connect.challenge", "heartbeat", "pong"):
+                pass  # internal
+
+            else:
+                logger.debug(f"Unhandled event: {event_name}")
+
+        elif frame_type == "req":
+            # Server-initiated request — respond if needed
+            method = frame.get("method", "")
+            req_id = frame.get("id", "")
+
+            if method == "chat.send":
+                payload = frame.get("params", {})
+                if self.on_user_message:
+                    session_id = payload.get("sessionId", payload.get("session_id", ""))
+                    text = payload.get("text", payload.get("content", payload.get("prompt", "")))
+                    await self.on_user_message(
+                        session_id=session_id,
+                        text=text,
+                    )
+                # Acknowledge
+                await self._send({
+                    "type": "res",
+                    "id": req_id,
+                    "ok": True,
+                    "payload": {},
+                })
+
+            else:
+                logger.debug(f"Unhandled request method: {method}")
+
+        elif frame_type == "res":
+            # Response to our request — currently ignored (fire-and-forget)
+            pass
 
         else:
             logger.debug(f"Unhandled frame type: {frame_type}")
 
-    # ── Outbound methods ──
+    # ── Outbound methods (v3 protocol) ──
 
-    async def send_text(self, session_id: str, text: str, metadata: dict | None = None):
-        """Send text response to a session."""
+    async def send_text_delta(self, session_id: str, delta: str):
+        """Send a streaming text delta to the session."""
         await self._connected.wait()
         await self._send({
-            "type": "agent.response",
-            "sessionId": session_id,
-            "content": text,
-            "metadata": metadata or {},
+            "type": "event",
+            "event": "session.message",
+            "payload": {
+                "sessionId": session_id,
+                "text": delta,
+                "streaming": True,
+            },
         })
 
-    async def send_stream_delta(self, session_id: str, delta: str):
-        """Send streaming text delta."""
+    async def send_text_complete(self, session_id: str, text: str):
+        """Send a complete text response to the session."""
         await self._connected.wait()
         await self._send({
-            "type": "agent.stream",
-            "sessionId": session_id,
-            "delta": delta,
+            "type": "event",
+            "event": "session.message",
+            "payload": {
+                "sessionId": session_id,
+                "text": text,
+                "streaming": False,
+                "done": True,
+            },
         })
 
     async def send_stream_end(self, session_id: str):
         """Signal end of streaming response."""
         await self._connected.wait()
         await self._send({
-            "type": "agent.stream.end",
-            "sessionId": session_id,
+            "type": "event",
+            "event": "session.stream.end",
+            "payload": {
+                "sessionId": session_id,
+            },
         })
 
     async def send_tool_status(
@@ -179,31 +244,27 @@ class GatewayChannel:
         """Notify Gateway about tool execution status."""
         await self._connected.wait()
         await self._send({
-            "type": "agent.tool_status",
-            "sessionId": session_id,
-            "tool": tool_name,
-            "status": status,
-            "result": result,
+            "type": "event",
+            "event": "session.tool",
+            "payload": {
+                "sessionId": session_id,
+                "tool": tool_name,
+                "status": status,
+                "result": result,
+            },
         })
 
     async def canvas_present(self, session_id: str, html: str, title: str = ""):
         """Render HTML on OpenClaw Canvas."""
         await self._connected.wait()
         await self._send({
-            "type": "canvas.render",
-            "sessionId": session_id,
-            "html": html,
-            "title": title,
-        })
-
-    async def invoke_agent(self, agent_id: str, action: str, params: dict):
-        """Invoke another OpenClaw agent."""
-        await self._connected.wait()
-        await self._send({
-            "type": "agent.invoke",
-            "agentId": agent_id,
-            "action": action,
-            "params": params,
+            "type": "event",
+            "event": "canvas.render",
+            "payload": {
+                "sessionId": session_id,
+                "html": html,
+                "title": title,
+            },
         })
 
     async def close(self):

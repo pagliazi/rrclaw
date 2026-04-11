@@ -18,6 +18,7 @@ Key design decisions:
 from __future__ import annotations
 
 import asyncio
+import os
 import logging
 import time
 from dataclasses import dataclass, field
@@ -185,7 +186,7 @@ class ConversationRuntime:
             messages = ctx.get("messages", self.session.to_api_messages())
             system = ctx.get("system_prompt", self.system_prompt)
             tools = ctx.get("tools", self.registry.get_all_active_schemas())
-            model = ctx.get("model", "claude-sonnet-4-6")
+            model = ctx.get("model", os.getenv("RRCLAW_DEFAULT_MODEL", "qwen3.5-plus"))
 
             # ── 2. LLM call (streaming) ──
             assistant_text = ""
@@ -333,7 +334,7 @@ class ConversationRuntime:
             "messages": self.session.to_api_messages(),
             "system_prompt": self.system_prompt,
             "tools": self.registry.get_all_active_schemas(),
-            "model": "claude-sonnet-4-6",
+            "model": os.getenv("RRCLAW_DEFAULT_MODEL", "qwen3.5-plus"),
         }
 
     @property
