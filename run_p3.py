@@ -12,6 +12,7 @@ Upgrades from P2:
 import asyncio
 import logging
 import os
+import json
 import time
 
 logging.basicConfig(
@@ -481,7 +482,7 @@ async def main():
         try:
             await gateway.connect()
             logger.info("Gateway connected")
-            asyncio.create_task(gateway.listen())
+            # Don't start listen() here — main loop will handle it
             # P5: wire canvas tool to gateway for live rendering
             canvas_tool._gateway = gateway
         except Exception as e:
@@ -524,21 +525,116 @@ async def main():
             logger.warning(f"ACP runtime failed to start: {e}")
             acp_runtime = None
 
-    # 13. Stdin mode (for testing)
-    logger.info("\n=== RRCLAW P3 Ready. Type messages below (Ctrl+C to quit) ===\n")
+    # 13. Main loop — Redis orchestrator mode, Gateway mode, or stdin mode
+    redis_mode = os.getenv("RRCLAW_REDIS_MODE", "").lower() == "true"
 
-    loop = asyncio.get_event_loop()
-    try:
-        while True:
+    if redis_mode and pyagent_bridge and pyagent_bridge.is_connected:
+        # --- RRCLAW 替代 orchestrator：直接订阅 Redis 频道处理 IM 消息 ---
+        import redis.asyncio as aioredis
+        listen_channel = os.getenv("RRCLAW_LISTEN_CHANNEL", "openclaw:orchestrator")
+        r = aioredis.from_url(REDIS_URL, decode_responses=True)
+        pubsub = r.pubsub()
+        await pubsub.subscribe(listen_channel)
+        logger.info(f"\n=== RRCLAW running in Redis mode (subscribed to {listen_channel}) ===\n")
+
+        async def _handle_redis_message(raw_data):
             try:
-                line = await loop.run_in_executor(None, input, "You> ")
-                if line.strip():
-                    await handle_user_message("stdin-session", line.strip())
-                    print()
-            except EOFError:
-                break
-    except (KeyboardInterrupt, asyncio.CancelledError):
-        pass
+                data = json.loads(raw_data)
+                params = data.get("params", {})
+                reply_channel = params.get("reply_channel", "")
+                text = params.get("args", params.get("command", ""))
+                uid = params.get("uid", data.get("sender", "unknown"))
+                msg_id = data.get("id", "")
+
+                if not text:
+                    return
+
+                # Send progress
+                if reply_channel:
+                    await r.publish(reply_channel, json.dumps({
+                        "type": "progress", "text": "🤖 RRCLAW 正在处理...",
+                        "in_reply_to": msg_id,
+                    }, ensure_ascii=False))
+
+                # Run through ConversationRuntime
+                session_key = f"im-{uid}"
+                if session_key not in sessions:
+                    sessions[session_key] = Session(session_id=session_key)
+                session = sessions[session_key]
+
+                runtime = ConversationRuntime(
+                    session=session, registry=registry, executor=executor,
+                    llm_provider=llm, context_provider=context_engine,
+                    error_classifier=error_classifier,
+                    system_prompt=system_prompt,
+                    config=TurnConfig(max_tool_rounds=10),
+                )
+                if background_review_system:
+                    runtime.background_review = background_review_system
+                    background_review_system.increment_turn()
+
+                full_text = ""
+                async for event in runtime.run_turn(text):
+                    if event.type == EventType.TEXT_DELTA:
+                        full_text += event.data
+                    elif event.type == EventType.TOOL_START:
+                        if reply_channel:
+                            await r.publish(reply_channel, json.dumps({
+                                "type": "progress",
+                                "text": f"🔧 调用 {event.data.name}...",
+                                "in_reply_to": msg_id,
+                            }, ensure_ascii=False))
+
+                # Reply
+                if reply_channel and full_text:
+                    await r.publish(reply_channel, json.dumps({
+                        "type": "done",
+                        "text": full_text,
+                        "in_reply_to": msg_id,
+                        "source": "rrclaw",
+                        "timestamp": time.time(),
+                    }, ensure_ascii=False))
+                    logger.info(f"Reply [{uid[:8]}]: {full_text[:80]}...")
+
+            except Exception as e:
+                logger.error(f"Redis message error: {e}", exc_info=True)
+                if reply_channel:
+                    await r.publish(reply_channel, json.dumps({
+                        "type": "done", "text": f"❌ RRCLAW 错误: {e}",
+                        "in_reply_to": msg_id,
+                    }, ensure_ascii=False))
+
+        try:
+            async for raw in pubsub.listen():
+                if raw["type"] != "message":
+                    continue
+                asyncio.create_task(_handle_redis_message(raw["data"]))
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            pass
+        finally:
+            await pubsub.unsubscribe(listen_channel)
+            await r.aclose()
+
+    elif GATEWAY_TOKEN and gateway and gateway.is_connected:
+        logger.info("\n=== RRCLAW running in Gateway mode (listening for IM messages) ===\n")
+        try:
+            await gateway.listen()
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            pass
+    else:
+        logger.info("\n=== RRCLAW P3 Ready. Type messages below (Ctrl+C to quit) ===\n")
+        loop = asyncio.get_event_loop()
+        try:
+            while True:
+                try:
+                    line = await loop.run_in_executor(None, input, "You> ")
+                    if line.strip():
+                        await handle_user_message("stdin-session", line.strip())
+                        print()
+                except EOFError:
+                    break
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            pass
 
     # Shutdown
     logger.info("Shutting down...")
