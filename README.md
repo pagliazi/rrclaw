@@ -715,6 +715,49 @@ Legacy `bridge/` package (9 files, 1,716 lines) retained for backward compatibil
 
 ---
 
+## FAQ
+
+**How do I get a ReachRich API Key?**
+
+1. Register / login at [rr.zayl.net](https://rr.zayl.net)
+2. Go to Settings → API Key
+3. Click "Generate", copy the `rk_...` key
+4. Set `REACHRICH_TOKEN=rk_...` in your `.env`
+
+**How do I switch LLM providers?**
+
+```bash
+# Use Qwen via DashScope
+export RRCLAW_PRIMARY_MODEL=dashscope/qwen3.5-plus
+
+# Use local Ollama
+export RRCLAW_PRIMARY_MODEL=ollama/qwen2.5-coder:14b
+```
+
+Or edit `providers.primary` in `rrclaw.yaml`.
+
+**Can I use market data without IM channels?**
+
+Yes. Skip OpenClaw Gateway and use the API directly:
+
+```bash
+# MCP server for Claude Desktop / Cursor
+rrclaw-market
+
+# Direct HTTP
+curl -H "Authorization: Bearer rk_..." https://rr.zayl.net/api/bridge/limitup/
+```
+
+**Redis connection refused?**
+
+```bash
+redis-cli PING          # Should return PONG
+brew install redis       # macOS
+sudo apt install redis   # Ubuntu
+```
+
+---
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
