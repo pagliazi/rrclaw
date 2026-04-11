@@ -68,18 +68,18 @@ if [ "$USE_DOCKER" = true ]; then
 
     # 检查 docker
     if ! command -v docker &>/dev/null; then
-        die "未找到 docker，请先安装: https://docs.docker.com/get-docker/"
+        die "未找到 docker,请先安装: https://docs.docker.com/get-docker/"
     fi
 
     if ! command -v docker-compose &>/dev/null && ! docker compose version &>/dev/null 2>&1; then
-        die "未找到 docker-compose，请先安装: https://docs.docker.com/compose/install/"
+        die "未找到 docker-compose,请先安装: https://docs.docker.com/compose/install/"
     fi
 
-    # 生成 .env（如果不存在）
+    # 生成 .env(如果不存在)
     if [ ! -f .env ]; then
         if [ -f .env.example ]; then
             cp .env.example .env
-            info "已从 .env.example 生成 .env，请编辑后重新运行"
+            info "已从 .env.example 生成 .env,请编辑后重新运行"
         else
             die "未找到 .env.example"
         fi
@@ -104,16 +104,22 @@ fi
 # 本地模式
 # ============================================================================
 
-# ── 第1步：检查前置依赖 ──
+# ── 第1步:检查前置依赖 ──
 step "检查前置依赖"
 
-# Python
-if command -v python3 &>/dev/null; then
-    PY="python3"
-elif command -v python &>/dev/null; then
-    PY="python"
-else
-    die "未找到 Python，请安装 Python 3.11+: https://python.org"
+# Python — 优先找高版本
+PY=""
+for candidate in python3.12 python3.11 python3 python; do
+    if command -v "$candidate" &>/dev/null; then
+        ver=$("$candidate" -c 'import sys; print(sys.version_info.minor)' 2>/dev/null || echo 0)
+        if [ "$ver" -ge 11 ]; then
+            PY="$candidate"
+            break
+        fi
+    fi
+done
+if [ -z "$PY" ]; then
+    die "未找到 Python 3.11+,请安装: https://python.org"
 fi
 
 PY_VERSION=$($PY -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
@@ -121,7 +127,7 @@ PY_MAJOR=$($PY -c 'import sys; print(sys.version_info.major)')
 PY_MINOR=$($PY -c 'import sys; print(sys.version_info.minor)')
 
 if [ "$PY_MAJOR" -lt 3 ] || ([ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 11 ]); then
-    die "Python 版本过低: $PY_VERSION（需要 3.11+）"
+    die "Python 版本过低: $PY_VERSION (需要 3.11+)"
 fi
 success "Python $PY_VERSION"
 
@@ -129,7 +135,7 @@ success "Python $PY_VERSION"
 if command -v redis-cli &>/dev/null; then
     success "Redis CLI 已安装"
 else
-    warn "未找到 redis-cli，请安装 Redis 7+"
+    warn "未找到 redis-cli,请安装 Redis 7+"
     warn "  macOS: brew install redis"
     warn "  Linux: sudo apt install redis-server"
 fi
@@ -138,14 +144,14 @@ fi
 if command -v git &>/dev/null; then
     success "git 已安装"
 else
-    die "未找到 git，请先安装 git"
+    die "未找到 git,请先安装 git"
 fi
 
-# ── 第2步：创建虚拟环境 ──
+# ── 第2步:创建虚拟环境 ──
 step "创建 Python 虚拟环境"
 
 if [ -d .venv ]; then
-    info "虚拟环境已存在，跳过创建"
+    info "虚拟环境已存在,跳过创建"
 else
     $PY -m venv .venv
     success "虚拟环境已创建: .venv/"
@@ -156,45 +162,45 @@ fi
 source .venv/bin/activate
 success "虚拟环境已激活"
 
-# ── 第3步：安装依赖 ──
+# ── 第3步:安装依赖 ──
 step "安装项目依赖"
 
 pip install --upgrade pip -q
 pip install -e ".[dev]" -q
 success "依赖安装完成"
 
-# ── 第4步：生成配置文件 ──
+# ── 第4步:生成配置文件 ──
 step "生成配置文件"
 
 if [ -f rrclaw.yaml ]; then
-    info "rrclaw.yaml 已存在，保留现有配置"
+    info "rrclaw.yaml 已存在,保留现有配置"
 else
     if [ -f config.example.yaml ]; then
         cp config.example.yaml rrclaw.yaml
         success "已生成 rrclaw.yaml"
     else
-        warn "未找到 config.example.yaml，跳过"
+        warn "未找到 config.example.yaml,跳过"
     fi
 fi
 
 if [ -f .env ]; then
-    info ".env 已存在，保留现有配置"
+    info ".env 已存在,保留现有配置"
     EXISTING_ENV=true
 else
     if [ -f .env.example ]; then
         cp .env.example .env
         success "已生成 .env"
     else
-        warn "未找到 .env.example，创建空 .env"
+        warn "未找到 .env.example,创建空 .env"
         touch .env
     fi
     EXISTING_ENV=false
 fi
 
-# ── 第5步：交互式配置 ──
+# ── 第5步:交互式配置 ──
 step "配置必要参数"
 
-# 辅助函数：读取 .env 中的值
+# 辅助函数:读取 .env 中的值
 get_env_val() {
     local key="$1"
     if [ -f .env ]; then
@@ -202,12 +208,12 @@ get_env_val() {
     fi
 }
 
-# 辅助函数：设置 .env 中的值
+# 辅助函数:设置 .env 中的值
 set_env_val() {
     local key="$1"
     local val="$2"
     if grep -qE "^${key}=" .env 2>/dev/null; then
-        # 跨平台 sed：macOS 和 Linux 兼容
+        # 跨平台 sed:macOS 和 Linux 兼容
         if [[ "$OSTYPE" == "darwin"* ]]; then
             sed -i '' "s|^${key}=.*|${key}=${val}|" .env
         else
@@ -219,11 +225,11 @@ set_env_val() {
 }
 
 echo ""
-info "以下配置将写入 .env 文件（直接回车使用默认值或保留现有值）"
+info "以下配置将写入 .env 文件(直接回车使用默认值或保留现有值)"
 echo ""
 
 # --- LLM API Key ---
-echo -e "${BOLD}LLM 提供商（至少配置一个）:${NC}"
+echo -e "${BOLD}LLM 提供商(至少配置一个):${NC}"
 
 CURRENT_ANTHROPIC=$(get_env_val "ANTHROPIC_API_KEY")
 if [ -n "$CURRENT_ANTHROPIC" ]; then
@@ -251,7 +257,7 @@ fi
 FINAL_ANTHROPIC=$(get_env_val "ANTHROPIC_API_KEY")
 FINAL_DASHSCOPE=$(get_env_val "DASHSCOPE_API_KEY")
 if [ -z "$FINAL_ANTHROPIC" ] && [ -z "$FINAL_DASHSCOPE" ]; then
-    warn "未配置任何 LLM API Key，RRCLAW 将无法调用大模型"
+    warn "未配置任何 LLM API Key,RRCLAW 将无法调用大模型"
     warn "运行后请在 .env 中填入 ANTHROPIC_API_KEY 或 DASHSCOPE_API_KEY"
 fi
 
@@ -272,7 +278,7 @@ if [ -n "$CURRENT_RR_TOKEN" ]; then
     MASKED="${CURRENT_RR_TOKEN:0:6}...${CURRENT_RR_TOKEN: -4}"
     echo -e "  当前 REACHRICH_TOKEN: ${CYAN}${MASKED}${NC}"
 fi
-echo -e "  ${YELLOW}获取方式: 登录 https://rr.zayl.net → 设置 → API Key → 生成密钥（格式: rk_...）${NC}"
+echo -e "  ${YELLOW}获取方式: 登录 https://rr.zayl.net → 设置 → API Key → 生成密钥(格式: rk_...)${NC}"
 read -rp "  REACHRICH_TOKEN [回车保留现有值]: " INPUT_RR_TOKEN
 if [ -n "$INPUT_RR_TOKEN" ]; then
     set_env_val "REACHRICH_TOKEN" "$INPUT_RR_TOKEN"
@@ -291,7 +297,7 @@ REDIS_URL="${INPUT_REDIS:-${CURRENT_REDIS:-$DEFAULT_REDIS}}"
 set_env_val "REDIS_URL" "$REDIS_URL"
 success "REDIS_URL = $REDIS_URL"
 
-# ── 第6步：检查 Redis 连接 ──
+# ── 第6步:检查 Redis 连接 ──
 step "检查 Redis 连接"
 
 if command -v redis-cli &>/dev/null; then
@@ -311,10 +317,10 @@ if command -v redis-cli &>/dev/null; then
         warn "  手动:  redis-server &"
     fi
 else
-    warn "未安装 redis-cli，跳过连接测试"
+    warn "未安装 redis-cli,跳过连接测试"
 fi
 
-# ── 第7步：测试 ReachRich API ──
+# ── 第7步:测试 ReachRich API ──
 step "测试 ReachRich API 连通性"
 
 FINAL_RR_TOKEN=$(get_env_val "REACHRICH_TOKEN")
@@ -342,10 +348,10 @@ if [ -n "$FINAL_RR_TOKEN" ] && [ -n "$FINAL_RR_URL" ]; then
                 ;;
         esac
     else
-        warn "未安装 curl，跳过 API 测试"
+        warn "未安装 curl,跳过 API 测试"
     fi
 else
-    warn "REACHRICH_TOKEN 或 REACHRICH_URL 未配置，跳过 API 测试"
+    warn "REACHRICH_TOKEN 或 REACHRICH_URL 未配置,跳过 API 测试"
 fi
 
 # ── 完成 ──
@@ -366,14 +372,17 @@ echo -e "  3. 启动 RRCLAW:"
 echo -e "     ${CYAN}python -m rrclaw --config rrclaw.yaml${NC}"
 echo ""
 echo -e "  ${BOLD}其他启动方式:${NC}"
-echo -e "     ${CYAN}rrclaw-mcp --backend pyagent${NC}     # MCP 服务（PyAgent 工具）"
-echo -e "     ${CYAN}rrclaw-market${NC}                     # MCP 服务（行情数据）"
+echo -e "     ${CYAN}rrclaw-mcp --backend pyagent${NC}     # MCP 服务(PyAgent 工具)"
+echo -e "     ${CYAN}rrclaw-market${NC}                     # MCP 服务(行情数据)"
 echo ""
 echo -e "  ${BOLD}配置文件:${NC}"
-echo -e "     .env          — 环境变量（API Key 等敏感信息）"
-echo -e "     rrclaw.yaml   — 系统配置（模型、超时等）"
+echo -e "     .env          — 环境变量(API Key 等敏感信息)"
+echo -e "     rrclaw.yaml   — 系统配置(模型、超时等)"
 echo ""
-echo -e "  ${BOLD}文档:${NC}"
-echo -e "     README.md          — English documentation"
-echo -e "     README.zh-CN.md    — 中文文档"
+echo -e "  ${BOLD}可选组件(接入 IM 通道时需要):${NC}"
+echo -e "     OpenClaw Gateway — Telegram/飞书/WebChat 接入"
+echo -e "       安装: ${CYAN}pip install openclaw${NC}  或  ${CYAN}docker pull ghcr.io/openclaw/openclaw${NC}"
+echo -e "     Hermes Agent — 扩展工具集"
+echo -e "       安装: ${CYAN}pip install hermes-agent${NC}"
+echo -e "     如果只用 API 调数据,不需要安装以上组件。"
 echo ""
