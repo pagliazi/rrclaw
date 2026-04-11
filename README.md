@@ -14,6 +14,8 @@
 </div>
 
 > **[中文文档](README.zh-CN.md)** | English
+>
+> **This repo has moved to [pagliazi/rrclaw](https://github.com/pagliazi/rrclaw).** Both repos are kept in sync.
 
 ---
 
