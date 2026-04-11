@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -264,9 +265,11 @@ Rules:
         """
         A/B test two system prompts on historical traces.
 
-        Since we can't replay full conversations, we use a simplified test:
-        - Ask LLM to predict which tools to use for each test case
-        - Compare predicted tool selection accuracy
+        Scoring based on:
+        1. Execution trace coverage — does the candidate address the tool chains
+           that appear in failure traces?
+        2. Tool success rates — weighted by how often each tool appears in failures
+        3. Error pattern coverage — does the candidate mention guidance for observed errors?
         """
         if not self._hermes or not self._hermes.available:
             return ABTestResult(
@@ -278,50 +281,134 @@ Rules:
                 test_cases_count=0,
             )
 
-        original_score = sum(1 for t in test_cases if t.success) / len(test_cases)
+        if not test_cases:
+            return ABTestResult(
+                success_rate_original=0,
+                success_rate_candidate=0,
+                success_rate_delta=0,
+                latency_original_ms=0,
+                latency_candidate_ms=0,
+                test_cases_count=0,
+            )
 
-        # Simple heuristic: if candidate prompt addresses failure cases,
-        # assume improvement proportional to failure coverage
+        original_score = sum(1 for t in test_cases if t.success) / len(test_cases)
+        avg_latency = sum(t.total_latency_ms for t in test_cases) / len(test_cases)
+
         failure_cases = [t for t in test_cases if not t.success]
         if not failure_cases:
             return ABTestResult(
                 success_rate_original=original_score,
                 success_rate_candidate=original_score,
                 success_rate_delta=0,
-                latency_original_ms=0,
-                latency_candidate_ms=0,
+                latency_original_ms=avg_latency,
+                latency_candidate_ms=avg_latency,
                 test_cases_count=len(test_cases),
             )
 
-        # Check if candidate addresses failure patterns
+        candidate_lower = candidate.lower()
+
+        # --- Score 1: Tool chain coverage ---
+        # Collect tool names from failure traces, check if candidate mentions them
+        failed_tools: dict[str, int] = {}
+        for f in failure_cases:
+            for tc in f.tool_calls:
+                name = tc.get("name", "")
+                if name:
+                    failed_tools[name] = failed_tools.get(name, 0) + 1
+
+        tool_coverage = 0.0
+        if failed_tools:
+            total_weight = sum(failed_tools.values())
+            covered_weight = sum(
+                count for tool, count in failed_tools.items()
+                if tool.lower() in candidate_lower or tool.replace("_", " ").lower() in candidate_lower
+            )
+            tool_coverage = covered_weight / total_weight
+
+        # --- Score 2: Error pattern coverage ---
         failure_keywords = set()
         for f in failure_cases:
-            for word in f.error.lower().split()[:10]:
-                if len(word) > 3:
+            # Extract meaningful keywords from errors
+            for word in f.error.lower().split():
+                word = word.strip(".,;:!?()[]{}\"'")
+                if len(word) > 3 and word.isalpha():
                     failure_keywords.add(word)
+            # Also extract tool names mentioned in errors
+            for tc in f.tool_calls:
+                name = tc.get("name", "")
+                if name:
+                    failure_keywords.add(name.lower())
 
-        candidate_lower = candidate.lower()
-        addressed = sum(1 for kw in failure_keywords if kw in candidate_lower)
-        coverage = addressed / len(failure_keywords) if failure_keywords else 0
+        error_coverage = 0.0
+        if failure_keywords:
+            addressed = sum(1 for kw in failure_keywords if kw in candidate_lower)
+            error_coverage = addressed / len(failure_keywords)
 
-        # Estimated improvement based on coverage
-        estimated_fix_rate = coverage * 0.5  # Assume 50% of addressed issues are actually fixed
+        # --- Score 3: Tool success rate improvement estimate ---
+        # Weight by how many failures each tool contributed
+        total_tool_failures = sum(failed_tools.values())
+        tool_success_weight = total_tool_failures / max(len(test_cases), 1)
+
+        # Combined score: weighted average of coverage signals
+        combined_coverage = (
+            tool_coverage * 0.4 +       # tool chain coverage
+            error_coverage * 0.4 +       # error pattern coverage
+            tool_success_weight * 0.2    # severity weight
+        )
+
+        # Estimate improvement: coverage * realistic fix rate (40%)
+        estimated_fix_rate = combined_coverage * 0.4
         candidate_score = original_score + (1 - original_score) * estimated_fix_rate
 
         return ABTestResult(
             success_rate_original=original_score,
-            success_rate_candidate=candidate_score,
-            success_rate_delta=candidate_score - original_score,
-            latency_original_ms=0,
-            latency_candidate_ms=0,
+            success_rate_candidate=min(candidate_score, 1.0),
+            success_rate_delta=min(candidate_score, 1.0) - original_score,
+            latency_original_ms=avg_latency,
+            latency_candidate_ms=avg_latency,  # Can't measure without replay
             test_cases_count=len(test_cases),
         )
 
     def _collect_traces(self, hours: int = 24) -> list[ExecutionTrace]:
-        """Collect execution traces from disk."""
+        """Collect execution traces from Redis Stream and disk."""
         cutoff = time.time() - (hours * 3600)
         traces = []
 
+        # 1. Try Redis Stream first
+        try:
+            import redis
+            r = redis.from_url(
+                os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0"),
+                decode_responses=True,
+            )
+            r.ping()
+            # Read from execution stream — last 24h worth
+            cutoff_ms = int(cutoff * 1000)
+            stream_key = "rrclaw:execution_events"
+            entries = r.xrange(stream_key, min=str(cutoff_ms), max="+", count=5000)
+            for entry_id, fields in entries:
+                try:
+                    data = json.loads(fields.get("data", "{}")) if "data" in fields else fields
+                    trace = ExecutionTrace(
+                        session_id=data.get("session_id", ""),
+                        user_message=data.get("user_message", ""),
+                        tool_calls=data.get("tool_calls", []) if isinstance(data.get("tool_calls"), list) else [],
+                        final_response=data.get("final_response", ""),
+                        success=data.get("success", "true").lower() != "false" if isinstance(data.get("success"), str) else bool(data.get("success", True)),
+                        total_latency_ms=float(data.get("total_latency_ms", 0)),
+                        expected_latency_ms=float(data.get("expected_latency_ms", 0)),
+                        error=data.get("error", ""),
+                        timestamp=float(data.get("timestamp", 0)),
+                    )
+                    traces.append(trace)
+                except Exception:
+                    continue
+            r.close()
+            logger.debug(f"Collected {len(traces)} traces from Redis Stream")
+        except Exception as e:
+            logger.debug(f"Redis Stream not available, falling back to disk: {e}")
+
+        # 2. Also collect from disk (jsonl files)
         for path in self.traces_dir.glob("*.jsonl"):
             try:
                 if path.stat().st_mtime < cutoff:

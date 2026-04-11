@@ -160,6 +160,20 @@ class RedisWorker(Worker):
             self.status.error = f"Redis ping failed: {e}"
             return False
 
+    async def _run(self):
+        """Verify Redis is connected via ping, then stay alive."""
+        try:
+            pong = await self.redis.ping()
+            if pong:
+                logger.info(f"Worker [redis]: ping OK, connection verified")
+                self.status.metadata["last_ping"] = time.time()
+            else:
+                self.status.error = "Redis ping returned False"
+                self._set_state(WorkerState.DEGRADED)
+        except Exception as e:
+            self.status.error = f"Redis run check failed: {e}"
+            self._set_state(WorkerState.DEGRADED)
+
     async def _shutdown(self):
         if self.redis:
             await self.redis.close()
@@ -197,6 +211,41 @@ class PyAgentWorker(Worker):
     async def _validate(self) -> bool:
         return len(self._discovered_agents) > 0
 
+    async def _run(self):
+        """Check heartbeats in Redis for each discovered agent."""
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(self.redis_url)
+        try:
+            alive = []
+            stale = []
+            now = time.time()
+            for agent in self._discovered_agents:
+                hb = await r.get(f"agent:{agent}:heartbeat")
+                if hb:
+                    try:
+                        hb_time = float(hb)
+                        if now - hb_time < 120:  # 2 min freshness
+                            alive.append(agent)
+                        else:
+                            stale.append(agent)
+                    except (ValueError, TypeError):
+                        alive.append(agent)  # non-numeric heartbeat = alive
+                else:
+                    stale.append(agent)
+            self.status.metadata["alive_agents"] = alive
+            self.status.metadata["stale_agents"] = stale
+            logger.info(
+                f"Worker [pyagent]: {len(alive)} alive, {len(stale)} stale "
+                f"(alive: {alive})"
+            )
+            if not alive and self._discovered_agents:
+                self._set_state(WorkerState.DEGRADED)
+        except Exception as e:
+            self.status.error = f"PyAgent heartbeat check failed: {e}"
+            self._set_state(WorkerState.DEGRADED)
+        finally:
+            await r.close()
+
 
 class HermesWorker(Worker):
     """Worker for Hermes runtime."""
@@ -204,6 +253,7 @@ class HermesWorker(Worker):
     def __init__(self, hermes_path: str = "/opt/hermes-agent"):
         super().__init__("hermes", required=False)
         self.hermes_path = hermes_path
+        self._runtime: Any = None
 
     async def _discover(self) -> list[str]:
         from pathlib import Path
@@ -220,6 +270,29 @@ class HermesWorker(Worker):
     async def _validate(self) -> bool:
         return "agent_loop" in self.status.capabilities
 
+    def set_runtime(self, runtime: Any):
+        """Set HermesNativeRuntime reference for run-time checks."""
+        self._runtime = runtime
+
+    async def _run(self):
+        """Verify HermesNativeRuntime is loaded and available."""
+        if self._runtime is not None:
+            available = getattr(self._runtime, "available", False)
+            self.status.metadata["runtime_available"] = available
+            logger.info(f"Worker [hermes]: runtime available={available}")
+            if not available:
+                self.status.error = "HermesNativeRuntime not available"
+                self._set_state(WorkerState.DEGRADED)
+        else:
+            # No runtime set, check path only
+            from pathlib import Path
+            p = Path(self.hermes_path)
+            exists = (p / "run_agent.py").exists()
+            self.status.metadata["path_exists"] = exists
+            logger.info(f"Worker [hermes]: path exists={exists}")
+            if not exists:
+                self._set_state(WorkerState.DEGRADED)
+
 
 class GatewayWorker(Worker):
     """Worker for OpenClaw Gateway connectivity."""
@@ -227,6 +300,7 @@ class GatewayWorker(Worker):
     def __init__(self, gateway_url: str = "ws://127.0.0.1:18789"):
         super().__init__("gateway", required=True)
         self.gateway_url = gateway_url
+        self._channel: Any = None
 
     async def _discover(self) -> list[str]:
         # Just check URL is configured
@@ -244,3 +318,31 @@ class GatewayWorker(Worker):
         except Exception as e:
             self.status.error = f"Gateway connection failed: {e}"
             return False
+
+    def set_channel(self, channel: Any):
+        """Set GatewayChannel reference for run-time checks."""
+        self._channel = channel
+
+    async def _run(self):
+        """Verify GatewayChannel is connected."""
+        if self._channel is not None:
+            connected = getattr(self._channel, "is_connected", False)
+            self.status.metadata["channel_connected"] = connected
+            logger.info(f"Worker [gateway]: channel connected={connected}")
+            if not connected:
+                self.status.error = "GatewayChannel not connected"
+                self._set_state(WorkerState.DEGRADED)
+        else:
+            # No channel set, try a quick websocket check
+            try:
+                import websockets
+                async with websockets.connect(
+                    self.gateway_url,
+                    close_timeout=3,
+                    open_timeout=3,
+                ) as ws:
+                    self.status.metadata["ws_reachable"] = True
+                    logger.info("Worker [gateway]: websocket reachable")
+            except Exception as e:
+                self.status.error = f"Gateway not reachable: {e}"
+                self._set_state(WorkerState.DEGRADED)

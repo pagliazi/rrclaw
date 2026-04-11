@@ -48,6 +48,14 @@ from rrclaw.context.memory.tier1_session import SessionMemory
 from rrclaw.context.memory.tier2_user import UserMemory
 from rrclaw.context.memory.tier3_system import SystemMemory
 
+# P4 imports
+from rrclaw.evolution.gepa_pipeline import GEPAPipeline
+from rrclaw.evolution.autoresearch_loop import StrategyResearchLoop
+from rrclaw.workers.boot import RedisWorker, PyAgentWorker, HermesWorker, GatewayWorker
+from rrclaw.workers.coordinator import WorkerCoordinator
+from rrclaw.commands.evolve import EvolveCommand
+from rrclaw.commands.research import ResearchCommand
+
 # Config
 GATEWAY_URL = os.getenv("GATEWAY_URL", "ws://127.0.0.1:18789")
 GATEWAY_TOKEN = os.getenv("GATEWAY_TOKEN", "")
@@ -77,6 +85,13 @@ skill_executor: SkillExecutor = None
 session_memory: SessionMemory = None
 user_memory: UserMemory = None
 system_memory: SystemMemory = None
+
+# P4 state
+gepa_pipeline: GEPAPipeline = None
+research_loop: StrategyResearchLoop = None
+worker_coordinator: WorkerCoordinator = None
+evolve_command: EvolveCommand = None
+research_command: ResearchCommand = None
 
 
 def build_provider_router() -> ProviderRouter:
@@ -133,6 +148,23 @@ async def handle_user_message(session_id: str, text: str):
         return
 
     logger.info(f"User [{session_id[:8]}]: {text[:80]}")
+
+    # --- P4: Slash command routing ---
+    stripped = text.strip()
+    if stripped.startswith("/evolve") and evolve_command:
+        args = stripped[len("/evolve"):].strip()
+        result = await evolve_command.execute(args)
+        print(f"\n{result}\n")
+        if gateway and gateway.is_connected:
+            await gateway.send_text_complete(session_id, result)
+        return
+    if stripped.startswith("/research") and research_command:
+        args = stripped[len("/research"):].strip()
+        result = await research_command.execute(args)
+        print(f"\n{result}\n")
+        if gateway and gateway.is_connected:
+            await gateway.send_text_complete(session_id, result)
+        return
 
     # Get or create session
     if session_id not in sessions:
@@ -273,6 +305,8 @@ async def main():
     global hermes_runtime, background_review_system, evolution_engine
     global skill_loader, skill_executor
     global session_memory, user_memory, system_memory
+    global gepa_pipeline, research_loop, worker_coordinator
+    global evolve_command, research_command
 
     logger.info("=== RRCLAW P3 启动 (Self-Learning) ===")
 
@@ -374,6 +408,56 @@ async def main():
     except Exception as e:
         logger.warning(f"Evolution engine start failed: {e}")
 
+    # --- P4: GEPA Pipeline ---
+    gepa_pipeline = GEPAPipeline(
+        hermes_runtime=hermes_runtime if hermes_runtime and hermes_runtime.available else None,
+    )
+    logger.info("GEPA pipeline initialized")
+
+    # --- P4: Autoresearch Loop ---
+    research_loop = StrategyResearchLoop(
+        hermes_runtime=hermes_runtime if hermes_runtime and hermes_runtime.available else None,
+        pyagent_bridge=pyagent_bridge,
+    )
+    logger.info("Autoresearch loop initialized")
+
+    # --- P4: Slash commands ---
+    evolve_command = EvolveCommand(
+        evolution_engine=evolution_engine,
+        gepa_pipeline=gepa_pipeline,
+        system_memory=system_memory,
+    )
+    research_command = ResearchCommand(research_loop=research_loop)
+    logger.info("Commands registered: /evolve, /research")
+
+    # --- P4: Worker Boot ---
+    worker_coordinator = WorkerCoordinator()
+    redis_worker = RedisWorker(redis_url=REDIS_URL)
+    pyagent_worker = PyAgentWorker(redis_url=REDIS_URL)
+    hermes_worker = HermesWorker(
+        hermes_path="/tmp/full-deploy-test/hermes-venv",
+    )
+    hermes_worker.set_runtime(hermes_runtime)
+    gateway_worker = GatewayWorker(gateway_url=GATEWAY_URL)
+
+    worker_coordinator.register(redis_worker)
+    worker_coordinator.register(pyagent_worker)
+    worker_coordinator.register(hermes_worker)
+    worker_coordinator.register(gateway_worker)
+
+    try:
+        boot_ok = await worker_coordinator.boot_all()
+        if boot_ok:
+            await worker_coordinator.start_all()
+            logger.info(f"Worker coordinator: all workers started (state={worker_coordinator.status.state})")
+        else:
+            logger.warning(f"Worker coordinator: boot incomplete (state={worker_coordinator.status.state})")
+            # Log individual worker states
+            for wname, wstatus in worker_coordinator.status.workers.items():
+                logger.info(f"  Worker [{wname}]: {wstatus.state.value} (error: {wstatus.error or 'none'})")
+    except Exception as e:
+        logger.warning(f"Worker coordinator boot failed: {e}")
+
     # 12. Gateway channel
     gateway = GatewayChannel(
         gateway_url=GATEWAY_URL,
@@ -410,6 +494,8 @@ async def main():
 
     # Shutdown
     logger.info("Shutting down...")
+    if worker_coordinator:
+        await worker_coordinator.shutdown_all()
     if evolution_engine:
         await evolution_engine.stop()
     if hermes_runtime:

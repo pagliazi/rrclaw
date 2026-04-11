@@ -219,9 +219,9 @@ class StrategyResearchLoop:
 
         try:
             result = await self._pyagent.call_agent(
-                agent_name="backtest",
-                command="backtest",
-                args={
+                agent="backtest",
+                action="run",
+                params={
                     "strategy": strategy_path,
                     "period": period,
                 },
