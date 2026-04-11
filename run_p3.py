@@ -56,6 +56,10 @@ from rrclaw.workers.coordinator import WorkerCoordinator
 from rrclaw.commands.evolve import EvolveCommand
 from rrclaw.commands.research import ResearchCommand
 
+# P5 imports
+from rrclaw.tools.builtin.canvas import CanvasTool
+from rrclaw.channels.acp_runtime import ACPRuntime
+
 # Config
 GATEWAY_URL = os.getenv("GATEWAY_URL", "ws://127.0.0.1:18789")
 GATEWAY_TOKEN = os.getenv("GATEWAY_TOKEN", "")
@@ -92,6 +96,9 @@ research_loop: StrategyResearchLoop = None
 worker_coordinator: WorkerCoordinator = None
 evolve_command: EvolveCommand = None
 research_command: ResearchCommand = None
+
+# P5 state
+acp_runtime: ACPRuntime = None
 
 
 def build_provider_router() -> ProviderRouter:
@@ -307,6 +314,7 @@ async def main():
     global session_memory, user_memory, system_memory
     global gepa_pipeline, research_loop, worker_coordinator
     global evolve_command, research_command
+    global acp_runtime
 
     logger.info("=== RRCLAW P3 启动 (Self-Learning) ===")
 
@@ -338,6 +346,10 @@ async def main():
         skills_dir=SKILLS_DIR,
         hermes_runtime=hermes_runtime if hermes_runtime.available else None,
     )
+    # P5: Register canvas tool as Tier 0
+    canvas_tool = CanvasTool(gateway=None)  # gateway set later if connected
+    registry.register_tier0(canvas_tool)
+
     stats = registry.stats()
     logger.info(
         f"Tool registry: {stats['tier0']} tier0, "
@@ -470,11 +482,47 @@ async def main():
             await gateway.connect()
             logger.info("Gateway connected")
             asyncio.create_task(gateway.listen())
+            # P5: wire canvas tool to gateway for live rendering
+            canvas_tool._gateway = gateway
         except Exception as e:
             logger.warning(f"Gateway connection failed: {e}")
             logger.info("Running in standalone mode (no IM channels)")
     else:
         logger.info("No GATEWAY_TOKEN -- running standalone (stdin mode)")
+
+    # --- P5: ACP Runtime ---
+    if os.getenv("ACP_ENABLED", "").lower() == "true":
+        # Lightweight adapter so ACPRuntime can create ConversationRuntime instances
+        class _ACPServerAdapter:
+            def _get_or_create_runtime(self, session_id: str) -> ConversationRuntime:
+                if session_id not in sessions:
+                    sessions[session_id] = Session(session_id=session_id)
+                sess = sessions[session_id]
+                rt = ConversationRuntime(
+                    session=sess,
+                    registry=registry,
+                    executor=executor,
+                    llm_provider=llm,
+                    context_provider=context_engine,
+                    error_classifier=error_classifier,
+                    config=TurnConfig(max_tool_rounds=10),
+                )
+                if background_review_system:
+                    rt.background_review = background_review_system
+                return rt
+
+        acp_port = int(os.getenv("ACP_PORT", "7790"))
+        acp_runtime = ACPRuntime(
+            server=_ACPServerAdapter(),
+            host="127.0.0.1",
+            port=acp_port,
+        )
+        try:
+            await acp_runtime.start()
+            logger.info(f"ACP runtime started on :{acp_port}")
+        except Exception as e:
+            logger.warning(f"ACP runtime failed to start: {e}")
+            acp_runtime = None
 
     # 13. Stdin mode (for testing)
     logger.info("\n=== RRCLAW P3 Ready. Type messages below (Ctrl+C to quit) ===\n")
@@ -494,6 +542,8 @@ async def main():
 
     # Shutdown
     logger.info("Shutting down...")
+    if acp_runtime:
+        await acp_runtime.stop()
     if worker_coordinator:
         await worker_coordinator.shutdown_all()
     if evolution_engine:
