@@ -2,16 +2,16 @@
 
 # RRCLAW
 
-**A股多智能体量化交易系统**
+**A股量化智能体框架**
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
-[![Redis](https://img.shields.io/badge/Redis-Pub%2FSub-red.svg)](https://redis.io)
-[![Anthropic](https://img.shields.io/badge/Anthropic-Claude-purple.svg)](https://anthropic.com)
+[![Redis](https://img.shields.io/badge/Redis-7+-red.svg)](https://redis.io)
+[![LLM](https://img.shields.io/badge/LLM-Claude%20%7C%20Qwen-purple.svg)](https://anthropic.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-*RRCLAW（ReachRich Claw）是面向**中国A股市场**的生产级多智能体系统。通过 LLM 驱动的智能体协作，实现实时行情分析、策略回测、因子挖掘和自动交易信号生成 —— 并具备从每次决策中自主进化的能力。*
+*RRCLAW 是一套 A 股量化交易框架。用大模型跑行情分析、策略回测、因子挖掘、条件选股，对接 [ReachRich](https://rr.zayl.net) 数据平台，覆盖沪深京 5000+ 标的。*
 
-[核心功能](#核心功能) | [一键部署](#一键部署) | [系统架构](#系统架构) | [使用示例](#使用示例) | [API 接口](#reachrich-api-接口) | [常见问题](#常见问题)
+[功能](#核心功能) | [一键部署](#一键部署) | [架构](#系统架构) | [用法](#使用示例) | [API 接口](#reachrich-api-接口) | [FAQ](#常见问题)
 
 </div>
 
@@ -21,29 +21,26 @@
 
 ## 项目简介
 
-RRCLAW 是量化交易系统的**大脑** —— 它不是桥接器或插件。RRCLAW 拥有完整的 LLM 推理循环，管理上下文压缩，执行工具调用，处理故障恢复，并从自身错误中持续学习。
+RRCLAW 跑的是大模型推理主循环 —— 接收指令、调工具拿数据、跑回测、返回结果。不是消息转发器，是整个量化系统的决策层。
 
-系统架构源自多个成熟项目的核心模式：
+架构参考了几个开源项目的设计：
 
-| 来源 | RRCLAW 继承的能力 |
-|------|-------------------|
-| **claude-code** `query.ts` | 异步生成器 LLM 循环、5层上下文压缩、ToolSearch 懒加载 |
-| **claw-code** `conversation.rs` | `ConversationRuntime<C, T>` 泛型模式（协议注入）、Worker 启动状态机、恢复方案 |
-| **hermes-agent** `run_agent.py` | 后台审查守护线程、PTC 迭代预算退还、凭证池（4种策略） |
-| **autoresearch** | 保留/丢弃实验循环、git-as-experiment-tracker |
+| 来源 | 拿了什么 |
+|------|---------|
+| **claude-code** | 异步 LLM 循环、上下文压缩、工具懒加载 |
+| **claw-code** | Runtime 泛型模式、Worker 状态机、故障恢复方案 |
+| **hermes-agent** | 后台审查线程、迭代预算控制、凭证池 |
 
 ---
 
 ## 核心功能
 
-- **实时行情数据** — 5000+ A股标的实时报价、涨跌停板、板块轮动、热门股票、市场情绪雷达
-- **策略回测** — backtrader / vectorbt 双引擎沙盒，支持 PBO 交叉验证
-- **因子挖掘** — 通过 core_engine 自动发现 Alpha 因子，支持滚动窗口优化
-- **DSL 选股** — 200+ 技术面/情绪面/基本面因子，多条件组合筛选
-- **自进化系统** — GEPA 流水线（生成 → 评估 → 推广 → 归档），自动优化提示词和策略
-- **7层容错** — 重试 → 熔断器 → 恢复方案 → 提供商切换 → 死亡螺旋防护
-- **多通道接入** — Telegram、微信、飞书、WebChat、API —— 所有通道共享同一智能内核
-- **API Key 认证** — 安全的 `rk_` Bearer Token 认证，用于外部服务集成
+- **实时行情** — 全市场报价、涨跌停板、板块轮动、异动监控，盘中秒级更新
+- **策略回测** — backtrader / vectorbt 双引擎，支持 PBO 交叉验证
+- **因子挖掘** — core_engine 自动扫描 Alpha 因子，滚动窗口验证
+- **条件选股** — 200+ 因子 DSL 组合筛选（技术面 / 情绪面 / 基本面）
+- **多通道** — Telegram、飞书、WebChat、REST API，同一套逻辑
+- **API Key** — `rk_` Bearer token 认证，给外部服务调数据用
 
 ---
 

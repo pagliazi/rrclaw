@@ -2,16 +2,16 @@
 
 # RRCLAW
 
-**Multi-Agent AI Harness for A-Share Quantitative Trading**
+**A股量化智能体框架 / A-Share Quant Trading Agent**
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
-[![Redis](https://img.shields.io/badge/Redis-Pub%2FSub-red.svg)](https://redis.io)
-[![Anthropic](https://img.shields.io/badge/Anthropic-Claude-purple.svg)](https://anthropic.com)
+[![Redis](https://img.shields.io/badge/Redis-7+-red.svg)](https://redis.io)
+[![LLM](https://img.shields.io/badge/LLM-Claude%20%7C%20Qwen-purple.svg)](https://anthropic.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-*RRCLAW (ReachRich Claw) is a production-grade multi-agent system for **China A-share quantitative trading**. It orchestrates LLM-powered agents to perform real-time market analysis, strategy backtesting, factor mining, and automated trading signal generation — with a self-evolving architecture that learns from every decision.*
+*RRCLAW 是一套 A 股量化交易框架。用大模型跑行情分析、策略回测、因子挖掘、条件选股，对接 [ReachRich](https://rr.zayl.net) 数据平台，覆盖沪深京 5000+ 标的。*
 
-[Features](#features) | [Quick Start](#quick-start) | [Architecture](#architecture) | [Usage](#usage) | [API](#reachrich-api-integration) | [Deployment](#deployment)
+[功能](#features) | [快速开始](#quick-start) | [架构](#architecture) | [用法](#usage) | [API 接口](#reachrich-api-integration) | [部署](#deployment)
 
 </div>
 
@@ -21,20 +21,18 @@
 
 ## Features
 
-- **Real-time Market Data** — live quotes, limit-up/down boards, sector rotation, hot stocks, sentiment radar for 5000+ A-share stocks
-- **Strategy Backtesting** — backtrader/vectorbt dual-engine sandbox with PBO cross-validation
-- **Factor Mining** — automated alpha factor discovery via core_engine with walk-forward optimization
-- **DSL Stock Screener** — multi-condition screening across 200+ technical/sentiment/fundamental factors
-- **Self-Evolution** — GEPA pipeline (Generate → Evaluate → Promote → Archive) automatically improves prompts and strategies
-- **7-Layer Fault Tolerance** — retry → circuit breaker → recovery recipes → provider fallback → death spiral prevention
-- **Multi-Channel** — Telegram, WeChat, Feishu, WebChat, API — all channels share the same intelligent core
-- **API Key Authentication** — secure `rk_` Bearer token auth for external service integration
+- **实时行情** — 全市场报价、涨跌停板、板块轮动、异动监控，盘中秒级更新
+- **策略回测** — backtrader / vectorbt 双引擎，支持 PBO 交叉验证
+- **因子挖掘** — core_engine 自动扫描 Alpha 因子，滚动窗口验证
+- **条件选股** — 200+ 因子的 DSL 组合筛选（技术面 / 情绪面 / 基本面）
+- **多通道** — Telegram、飞书、WebChat、REST API，同一套逻辑
+- **API Key 认证** — `rk_` Bearer token，给外部服务调数据用
 
 ---
 
 ## What Is RRCLAW
 
-RRCLAW is the **brain** of the quantitative trading system — not a bridge or plugin. It owns the LLM loop, manages context compression, executes tools, handles fault recovery, and learns from its own mistakes.
+RRCLAW 跑的是 LLM 推理主循环 —— 接收用户指令，调工具拿数据，跑回测，返回结果。不是消息转发器，是决策层。
 
 ### Key Capabilities
 
