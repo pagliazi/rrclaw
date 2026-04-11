@@ -171,6 +171,7 @@ def _load_skills_from_yaml(skills_dir: str) -> list[dict[str, Any]]:
 def build_tool_registry(
     bridge: PyAgentBridge,
     skills_dir: str = "",
+    hermes_runtime: "Any | None" = None,
 ) -> GlobalToolRegistry:
     """
     Build a complete GlobalToolRegistry from PYAGENT_COMMANDS + skills YAML.
@@ -304,7 +305,27 @@ def build_tool_registry(
         registry.register_tier1(tool, index)
         yaml_only_count += 1
 
-    # ── Step 3: Register ToolSearchTool as Tier 0 (last, so it sees the full index) ──
+    # ── Step 3: Register hermes_delegate as Tier 1 tool ──
+    if hermes_runtime is not None:
+        try:
+            from rrclaw.tools.hermes.runtime import HermesDelegateTool
+            hermes_tool = HermesDelegateTool(hermes_runtime)
+            hermes_index = ToolIndex(
+                name="hermes_delegate",
+                description="将复杂任务委派给 Hermes Agent 执行（代码执行、文件操作、深度分析）",
+                keywords=["hermes", "delegate", "委派", "代理", "子任务", "执行"],
+                agent="hermes",
+                category="agent",
+                timeout=300,
+                is_concurrent_safe=False,
+            )
+            registry.register_tier1(hermes_tool, hermes_index)
+            tier1_count += 1
+            logger.info("Hermes delegate tool registered as Tier 1")
+        except Exception as e:
+            logger.warning(f"Failed to register hermes_delegate: {e}")
+
+    # ── Step 4: Register ToolSearchTool as Tier 0 (last, so it sees the full index) ──
     search_tool = ToolSearchTool(registry)
     registry.register_tier0(search_tool)
     tier0_count += 1

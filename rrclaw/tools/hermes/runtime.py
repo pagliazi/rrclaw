@@ -58,7 +58,7 @@ class HermesNativeRuntime:
 
     def __init__(
         self,
-        hermes_path: str = "/opt/hermes-agent",
+        hermes_path: str = "/tmp/full-deploy-test/hermes-venv",
         model: str = "anthropic/claude-sonnet-4-6",
         max_workers: int = 3,
     ):
@@ -83,6 +83,11 @@ class HermesNativeRuntime:
 
             if str(self.hermes_path) not in sys.path:
                 sys.path.insert(0, str(self.hermes_path))
+
+            # Also check venv site-packages
+            for sp in self.hermes_path.glob("lib/*/site-packages"):
+                if str(sp) not in sys.path:
+                    sys.path.insert(0, str(sp))
 
             # Try importing the agent module
             run_agent = importlib.import_module("run_agent")
@@ -198,21 +203,19 @@ class HermesNativeRuntime:
                 model=self.model,
                 enabled_toolsets=toolsets,
                 max_iterations=max_iterations,
-                background_review=background_review,
-                memory_nudge_interval=memory_nudge_interval,
-                skill_nudge_interval=skill_nudge_interval,
+                quiet_mode=quiet_mode,
             )
 
-            # Run the conversation
-            if hasattr(agent, "run_conversation"):
+            # Prefer chat() for simple string return, fall back to run_conversation
+            if hasattr(agent, "chat"):
+                raw_result = agent.chat(prompt)
+            elif hasattr(agent, "run_conversation"):
                 raw_result = agent.run_conversation(prompt)
-            elif hasattr(agent, "run"):
-                raw_result = agent.run(prompt)
             else:
                 return HermesResult(
                     success=False,
                     output="",
-                    errors=["AIAgent has no run_conversation or run method"],
+                    errors=["AIAgent has no chat or run_conversation method"],
                 )
 
             return self._parse_result(raw_result)
@@ -272,3 +275,87 @@ class HermesNativeRuntime:
         """Shutdown the thread pool."""
         self._executor.shutdown(wait=False)
         logger.info("Hermes runtime shut down")
+
+
+class HermesDelegateTool:
+    """
+    Tier 1 tool that delegates tasks to Hermes AIAgent.
+
+    Registered as `hermes_delegate` in the tool registry.
+    """
+
+    def __init__(self, hermes_runtime: HermesNativeRuntime):
+        self._runtime = hermes_runtime
+        from rrclaw.tools.base import ToolSpec
+        self.spec = ToolSpec(
+            name="hermes_delegate",
+            description="将复杂任务委派给 Hermes Agent 执行（支持代码执行、文件操作、深度分析等）",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": "要委派给 Hermes 的任务描述",
+                    },
+                    "toolsets": {
+                        "type": "string",
+                        "description": "启用的工具集，逗号分隔（默认: core）",
+                    },
+                    "max_iterations": {
+                        "type": "integer",
+                        "description": "最大迭代次数（默认: 30）",
+                    },
+                },
+                "required": ["task"],
+            },
+            is_tier0=False,
+            should_defer=True,
+            is_concurrent_safe=False,
+            timeout=300.0,
+            category="agent",
+            keywords=["hermes", "delegate", "委派", "代理", "子任务", "执行"],
+        )
+
+    async def call(self, input: dict) -> "ToolResult":
+        from rrclaw.tools.base import ToolResult
+
+        if not self._runtime.available:
+            return ToolResult.error("Hermes runtime not available")
+
+        task = input.get("task", "")
+        if not task:
+            return ToolResult.error("Missing required field: task")
+
+        toolsets_str = input.get("toolsets", "core")
+        toolsets = [t.strip() for t in toolsets_str.split(",")]
+        max_iterations = input.get("max_iterations", 30)
+
+        result = await self._runtime.run_task(
+            prompt=task,
+            toolsets=toolsets,
+            max_iterations=max_iterations,
+        )
+
+        if result.success:
+            return ToolResult.success(result.output)
+        else:
+            error_msg = "; ".join(result.errors) if result.errors else "Unknown error"
+            return ToolResult.error(f"Hermes task failed: {error_msg}")
+
+    def validate_input(self, input: dict):
+        if "task" not in input:
+            from rrclaw.tools.base import ToolResult
+            return ToolResult.error("Missing required field: task")
+        return None
+
+    @property
+    def name(self) -> str:
+        return self.spec.name
+
+    @property
+    def schema_dict(self) -> dict:
+        return {
+            "name": self.spec.name,
+            "description": self.spec.description,
+            "input_schema": self.spec.input_schema,
+        }

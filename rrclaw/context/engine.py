@@ -45,6 +45,11 @@ class ContextEngine:
         self._autocompact_max_failures = 3
         self._has_attempted_reactive_compact = False
 
+        # Memory tiers (set externally by run_p3.py)
+        self.session_memory = None   # Tier 1
+        self.user_memory = None      # Tier 2
+        self.system_memory = None    # Tier 3
+
     async def prepare(self, session: Session) -> dict[str, Any]:
         """Prepare context for LLM call with 5-layer compression."""
         messages = session.to_api_messages()
@@ -82,6 +87,27 @@ class ContextEngine:
             system_prompt = builder.build_system_prompt(session)
         except Exception:
             system_prompt = ""
+
+        # Inject memory tier context into system prompt
+        memory_parts = []
+        try:
+            if self.session_memory:
+                s1 = self.session_memory.get_context_string()
+                if s1:
+                    memory_parts.append(f"## 会话记忆\n{s1}")
+            if self.user_memory:
+                s2 = self.user_memory.get_context_string()
+                if s2:
+                    memory_parts.append(f"## 用户档案\n{s2}")
+            if self.system_memory:
+                s3 = self.system_memory.get_context_string()
+                if s3:
+                    memory_parts.append(f"## 系统知识\n{s3}")
+        except Exception as e:
+            logger.debug(f"Memory context injection failed: {e}")
+
+        if memory_parts:
+            system_prompt += "\n\n" + "\n\n".join(memory_parts)
 
         return {
             "messages": messages,
