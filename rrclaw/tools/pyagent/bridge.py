@@ -67,6 +67,37 @@ class PyAgentBridge:
     def is_connected(self) -> bool:
         return self._connected
 
+    async def _try_reconnect(self) -> bool:
+        """Attempt to reconnect to Redis. Returns True on success."""
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
+            try:
+                logger.info(f"Redis reconnect attempt {attempt}/{max_attempts}...")
+                # Close stale connections
+                if self._redis:
+                    try:
+                        await self._redis.aclose()
+                    except Exception:
+                        pass
+                if self._redis_raw:
+                    try:
+                        await self._redis_raw.aclose()
+                    except Exception:
+                        pass
+
+                self._redis = aioredis.from_url(self.redis_url, decode_responses=True)
+                self._redis_raw = aioredis.from_url(self.redis_url, decode_responses=False)
+                await self._redis.ping()
+                self._connected = True
+                logger.info("Redis reconnected successfully")
+                return True
+            except Exception as e:
+                logger.warning(f"Redis reconnect attempt {attempt} failed: {e}")
+                await asyncio.sleep(min(2 ** attempt, 10))
+
+        self._connected = False
+        return False
+
     async def call_agent(
         self,
         agent: str,
@@ -79,9 +110,13 @@ class PyAgentBridge:
 
         Uses the AgentMessage format:
         {id, sender, target, action, params, reply_to, timestamp}
+
+        Auto-reconnects if Redis is unavailable. Returns a tool error
+        (not crash) if reconnection fails.
         """
-        if not self._redis:
-            raise ConnectionError("PyAgent bridge not connected")
+        if not self._redis or not self._connected:
+            if not await self._try_reconnect():
+                return {"error": "Redis unavailable — cannot reach PyAgent. Will retry on next call."}
 
         msg_id = uuid.uuid4().hex[:12]
         message = {
@@ -129,9 +164,19 @@ class PyAgentBridge:
 
             return {"error": "Reply channel closed unexpectedly"}
 
+        except (ConnectionError, OSError, aioredis.ConnectionError) as e:
+            logger.warning(f"Redis connection lost during call_agent: {e}")
+            self._connected = False
+            # Attempt reconnect for next call
+            asyncio.create_task(self._try_reconnect())
+            return {"error": f"Redis connection lost: {e}. Reconnecting..."}
+
         finally:
-            await pubsub.unsubscribe(reply_channel)
-            await pubsub.aclose()
+            try:
+                await pubsub.unsubscribe(reply_channel)
+                await pubsub.aclose()
+            except Exception:
+                pass  # Connection already lost
 
 
 class PyAgentTool(Tool):

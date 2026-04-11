@@ -35,6 +35,18 @@ class ClassifiedError:
     cooldown_seconds: int = 0
     message: str = ""
 
+    @property
+    def should_retry(self) -> bool:
+        return self.retryable
+
+    @property
+    def retry_after_ms(self) -> int:
+        return self.cooldown_seconds * 1000
+
+    @property
+    def category(self) -> str:
+        return self.reason.value
+
 
 class RRClawErrorClassifier:
     """Classify errors and return recovery hints."""
