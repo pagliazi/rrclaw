@@ -278,7 +278,7 @@ class RRClawServer:
         except ImportError:
             from rrclaw.runtime.providers.anthropic import AnthropicProvider
             self.llm_provider = AnthropicProvider(
-                model=self.config.get("providers", "primary", default="anthropic/claude-sonnet-4-6"),
+                model=self.config.get("providers", "primary", default="qwen3.5-plus"),
             )
 
     def _init_context_provider(self):

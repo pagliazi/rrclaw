@@ -87,7 +87,7 @@ class ContextEngine:
             "messages": messages,
             "system_prompt": system_prompt,
             "tools": self.registry.get_all_active_schemas(),
-            "model": self.config.get("providers", "primary", default="claude-sonnet-4-6"),
+            "model": self.config.get("providers", "primary", default="qwen3.5-plus"),
         }
 
     async def force_compact(self, session: Session) -> bool:
@@ -110,7 +110,8 @@ class ContextEngine:
     # ── Layer 1: Tool Result Budget ──
 
     def _apply_tool_result_budget(self, messages: list[dict]) -> list[dict]:
-        """Truncate oversized tool results with preview."""
+        """Truncate oversized tool results with preview (>10K chars)."""
+        budget = 10000  # 10K char budget per tool result
         result = []
         for msg in messages:
             if msg.get("role") == "user" and isinstance(msg.get("content"), list):
@@ -119,14 +120,15 @@ class ContextEngine:
                     if (
                         block.get("type") == "tool_result"
                         and isinstance(block.get("content"), str)
-                        and len(block["content"]) > self.max_tool_result_chars
+                        and len(block["content"]) > budget
                     ):
-                        truncated = block["content"][:self.max_tool_result_chars]
+                        original_len = len(block["content"])
+                        truncated = block["content"][:budget]
                         block = {
                             **block,
                             "content": (
                                 f"{truncated}\n\n"
-                                f"[... truncated from {len(block['content'])} chars]"
+                                f"[...truncated, {original_len} chars total]"
                             ),
                         }
                     new_content.append(block)
@@ -138,13 +140,10 @@ class ContextEngine:
     # ── Layer 2: History Snip ──
 
     def _apply_history_snip(self, messages: list[dict]) -> list[dict]:
-        """Remove old conversation segments beyond a window."""
-        if len(messages) <= 20:
-            return messages
-
-        # Keep first 2 messages (system context) and last 16
+        """Keep first 2 messages + last 10 messages, drop middle."""
         keep_start = 2
-        keep_end = 16
+        keep_end = 10
+
         if len(messages) <= keep_start + keep_end:
             return messages
 
@@ -158,14 +157,18 @@ class ContextEngine:
     # ── Layer 3: Microcompact ──
 
     def _apply_microcompact(self, messages: list[dict]) -> list[dict]:
-        """Rule-based folding of old tool results (no LLM needed)."""
+        """
+        Replace consecutive assistant messages (no tool calls) with summary.
+        Also compact old tool results in the first half.
+        """
         if len(messages) <= 10:
             return messages
 
         result = []
-        # Only compact messages in the first half
         midpoint = len(messages) // 2
 
+        # Pass 1: compact old tool results
+        compacted = []
         for i, msg in enumerate(messages):
             if i < midpoint and msg.get("role") == "user":
                 content = msg.get("content")
@@ -180,20 +183,133 @@ class ContextEngine:
                                     "content": original[:200] + "\n[... compacted]",
                                 }
                         new_content.append(block)
-                    result.append({**msg, "content": new_content})
+                    compacted.append({**msg, "content": new_content})
+                else:
+                    compacted.append(msg)
+            else:
+                compacted.append(msg)
+
+        # Pass 2: merge consecutive text-only assistant messages in first half
+        i = 0
+        while i < len(compacted):
+            msg = compacted[i]
+            if (
+                i < midpoint
+                and msg.get("role") == "assistant"
+                and self._is_text_only_assistant(msg)
+            ):
+                # Collect consecutive text-only assistant messages
+                texts = [self._extract_assistant_text(msg)]
+                j = i + 1
+                while (
+                    j < midpoint
+                    and j < len(compacted)
+                    and compacted[j].get("role") == "assistant"
+                    and self._is_text_only_assistant(compacted[j])
+                ):
+                    texts.append(self._extract_assistant_text(compacted[j]))
+                    j += 1
+
+                if len(texts) > 1:
+                    # Merge into summary
+                    summary = " | ".join(t[:80] for t in texts if t)
+                    result.append({
+                        "role": "assistant",
+                        "content": [{"type": "text", "text": f"[合并{len(texts)}条回复] {summary}"}],
+                    })
                 else:
                     result.append(msg)
+                i = j
             else:
                 result.append(msg)
+                i += 1
+
         return result
+
+    @staticmethod
+    def _is_text_only_assistant(msg: dict) -> bool:
+        """Check if an assistant message has only text content (no tool_use)."""
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            return True
+        if isinstance(content, list):
+            return all(b.get("type") != "tool_use" for b in content)
+        return False
+
+    @staticmethod
+    def _extract_assistant_text(msg: dict) -> str:
+        """Extract text from an assistant message."""
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = [b.get("text", "") for b in content if b.get("type") == "text"]
+            return " ".join(parts)
+        return ""
 
     # ── Layer 4: Context Collapse ──
 
     def _apply_context_collapse(self, messages: list[dict]) -> list[dict]:
-        """Project old messages into summary blocks."""
-        # For now, this is handled by history_snip.
-        # Full implementation would use a lightweight summarizer.
-        return messages
+        """If total estimated tokens > 150K, summarize old messages into a [Context Summary]."""
+        collapse_threshold = 150000
+        estimated = self._estimate_tokens(messages)
+
+        if estimated <= collapse_threshold:
+            return messages
+
+        logger.info(
+            f"Context collapse triggered: ~{estimated} tokens > {collapse_threshold}"
+        )
+
+        # Keep last 6 messages intact, summarize the rest
+        keep_tail = 6
+        if len(messages) <= keep_tail:
+            return messages
+
+        old_messages = messages[:-keep_tail]
+        tail_messages = messages[-keep_tail:]
+
+        # Build a rule-based summary of old messages
+        summary_parts = []
+        tool_calls_seen: list[str] = []
+        user_topics: list[str] = []
+
+        for msg in old_messages:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+
+            if role == "user":
+                text = content if isinstance(content, str) else ""
+                if isinstance(content, list):
+                    for b in content:
+                        if b.get("type") == "text":
+                            text = b.get("text", "")
+                        elif b.get("type") == "tool_result":
+                            tool_id = b.get("tool_use_id", "")
+                            if tool_id:
+                                tool_calls_seen.append(tool_id)
+                if text and not text.startswith("[") and not text.startswith("<system>"):
+                    user_topics.append(text[:100])
+
+            elif role == "assistant" and isinstance(content, list):
+                for b in content:
+                    if b.get("type") == "tool_use":
+                        name = b.get("name", "?")
+                        tool_calls_seen.append(name)
+
+        if user_topics:
+            summary_parts.append("用户话题: " + "; ".join(user_topics[:5]))
+        if tool_calls_seen:
+            unique_tools = list(dict.fromkeys(tool_calls_seen))[:10]
+            summary_parts.append("已调用工具: " + ", ".join(unique_tools))
+        summary_parts.append(f"(已压缩 {len(old_messages)} 条消息)")
+
+        summary_msg = {
+            "role": "user",
+            "content": "[Context Summary]\n" + "\n".join(summary_parts),
+        }
+
+        return [summary_msg] + tail_messages
 
     # ── Layer 5: Autocompact ──
 

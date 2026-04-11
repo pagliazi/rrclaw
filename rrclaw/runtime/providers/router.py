@@ -1,7 +1,7 @@
 """
 Provider Router — prefix routing + fallback chain.
 
-Routes model strings like "anthropic/claude-sonnet-4-6" to the right provider.
+Routes model strings like "qwen3.5-plus" to the right provider.
 Falls back on consecutive 529 errors.
 """
 
@@ -22,7 +22,7 @@ class ProviderRouter(BaseLLMProvider):
 
     Config:
         providers:
-            primary: anthropic/claude-sonnet-4-6
+            primary: qwen3.5-plus
             fallback_chain:
                 - dashscope/qwen3.5-plus
                 - ollama/qwen2.5-coder:14b
@@ -33,7 +33,7 @@ class ProviderRouter(BaseLLMProvider):
         self._providers: dict[str, BaseLLMProvider] = {}
         self._retry = ApiRetryPolicy()
 
-        primary = config.get("providers", "primary", default="anthropic/claude-sonnet-4-6")
+        primary = config.get("providers", "primary", default="qwen3.5-plus")
         fallback_chain = config.get("providers", "fallback_chain", default=[])
 
         self._model_chain = [primary] + (fallback_chain if isinstance(fallback_chain, list) else [])

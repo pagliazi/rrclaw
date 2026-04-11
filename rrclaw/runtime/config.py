@@ -23,13 +23,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     },
     "hermes": {
         "agent_path": os.getenv("HERMES_AGENT_PATH", os.path.expanduser("~/hermes-agent")),
-        "model": "claude-sonnet-4-6",
+        "model": "qwen3.5-plus",
         "provider": "anthropic",
         "max_workers": 4,
         "default_toolsets": ["core", "web", "terminal"],
     },
     "providers": {
-        "primary": "anthropic/claude-sonnet-4-6",
+        "primary": "qwen3.5-plus",
         "fallback_chain": [
             "dashscope/qwen3.5-plus",
             "ollama/qwen2.5-coder:14b",

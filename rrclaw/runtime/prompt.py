@@ -61,13 +61,20 @@ class PromptBuilder:
     def build_system_prompt(self, session=None) -> str:
         parts = [self._load_soul()]
 
-        # Tier 1 tool index
+        # Tier 0 tool descriptions (brief, not full schema)
+        tier0 = self.registry.tier0_tools
+        if tier0:
+            parts.append("\n## 已加载工具 (可直接调用)")
+            for name, tool in tier0.items():
+                parts.append(f"- `{name}`: {tool.spec.description}")
+
+        # Tier 1 tool index (one line per tool: "name -- description")
         index = self.registry.tier1_index
         if index:
-            parts.append("\n## 可用工具索引")
-            parts.append("使用 `tool_search` 搜索以下工具获取完整参数说明:\n")
+            parts.append("\n## 可用工具索引 (使用 tool_search 搜索后调用)")
+            parts.append("以下工具需先用 `tool_search` 搜索关键词获取参数说明:\n")
 
-            # Group by category
+            # Group by category for readability
             by_category: dict[str, list] = {}
             for idx in index:
                 cat = idx.category
@@ -76,12 +83,19 @@ class PromptBuilder:
                 by_category[cat].append(idx)
 
             for cat in sorted(by_category.keys()):
-                parts.append(f"\n### {cat}")
+                parts.append(f"**{cat}**")
                 for idx in by_category[cat]:
-                    parts.append(f"- **{idx.name}**: {idx.description}")
+                    parts.append(f"  {idx.name} -- {idx.description}")
+
+        # Instruction for deferred tools
+        if index:
+            parts.append(
+                "\n> 需要使用上述工具时，先调用 `tool_search` 搜索关键词，"
+                "获取完整参数后再调用。"
+            )
 
         # Session context
-        if session and session.user_preferences:
+        if session and hasattr(session, "user_preferences") and session.user_preferences:
             parts.append(f"\n## 用户偏好\n{session.user_preferences}")
 
         return "\n".join(parts)
