@@ -9,9 +9,9 @@
 [![LLM](https://img.shields.io/badge/LLM-Claude%20%7C%20Qwen-purple.svg)](https://anthropic.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-*RRCLAW 是一套 A 股量化交易框架。用大模型跑行情分析、策略回测、因子挖掘、条件选股，对接 [ReachRich](https://rr.zayl.net) 数据平台，覆盖沪深京 5000+ 标的。*
+*RRCLAW 是基于 LLM 的 A 股量化交易框架，支持实时行情分析、策略回测、因子挖掘与多条件选股。<br>对接 [ReachRich](https://rr.zayl.net) 数据平台，覆盖沪深京 5000+ 标的。*
 
-[功能](#features) | [快速开始](#quick-start) | [架构](#architecture) | [用法](#usage) | [API 接口](#reachrich-api-integration) | [部署](#deployment)
+[Features](#features) | [Quick Start](#quick-start) | [Architecture](#architecture) | [Usage](#usage) | [API](#reachrich-api-integration) | [Deployment](#deployment)
 
 </div>
 
@@ -21,18 +21,18 @@
 
 ## Features
 
-- **实时行情** — 全市场报价、涨跌停板、板块轮动、异动监控，盘中秒级更新
-- **策略回测** — backtrader / vectorbt 双引擎，支持 PBO 交叉验证
-- **因子挖掘** — core_engine 自动扫描 Alpha 因子，滚动窗口验证
-- **条件选股** — 200+ 因子的 DSL 组合筛选（技术面 / 情绪面 / 基本面）
-- **多通道** — Telegram、飞书、WebChat、REST API，同一套逻辑
-- **API Key 认证** — `rk_` Bearer token，给外部服务调数据用
+- **Real-time Market Data** — 全市场报价、涨跌停板、板块轮动、异动监控，盘中秒级更新
+- **Strategy Backtesting** — backtrader / vectorbt 双引擎，支持 PBO 交叉验证
+- **Factor Mining** — core_engine Alpha 因子扫描，滚动窗口优化验证
+- **DSL Stock Screener** — 200+ 因子 DSL 组合筛选（技术面 / 情绪面 / 基本面）
+- **Multi-Channel** — Telegram、飞书、WebChat、REST API，统一调度
+- **API Key Auth** — `rk_` Bearer token 认证，支持外部服务接入
 
 ---
 
 ## What Is RRCLAW
 
-RRCLAW 跑的是 LLM 推理主循环 —— 接收用户指令，调工具拿数据，跑回测，返回结果。不是消息转发器，是决策层。
+RRCLAW 负责 LLM 推理主循环：接收用户指令 → 调度工具获取数据 → 执行回测 → 返回结构化结果。定位是量化系统的决策调度层，而非消息转发中间件。
 
 ### Key Capabilities
 
