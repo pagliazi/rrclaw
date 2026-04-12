@@ -18,24 +18,24 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     datefmt="%H:%M:%S",
 )
-logger = logging.getLogger("rrclaw.p2")
+logger = logging.getLogger("rragent.p2")
 
 # Suppress noisy loggers
 logging.getLogger("websockets").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-from rrclaw.runtime.conversation import ConversationRuntime, TurnConfig, EventType
-from rrclaw.runtime.providers.router import ProviderRouter, ProviderConfig
-from rrclaw.runtime.resilience.error_classifier import RRClawErrorClassifier
-from rrclaw.runtime.session import Session
-from rrclaw.runtime.config import RRClawConfig
-from rrclaw.tools.registry import GlobalToolRegistry
-from rrclaw.tools.executor import ToolExecutor
-from rrclaw.tools.pyagent.bridge import PyAgentBridge
-from rrclaw.tools.index_builder import build_tool_registry
-from rrclaw.context.engine import ContextEngine
-from rrclaw.runtime.prompt import PromptBuilder
-from rrclaw.channels.gateway import GatewayChannel
+from rragent.runtime.conversation import ConversationRuntime, TurnConfig, EventType
+from rragent.runtime.providers.router import ProviderRouter, ProviderConfig
+from rragent.runtime.resilience.error_classifier import RRClawErrorClassifier
+from rragent.runtime.session import Session
+from rragent.runtime.config import RRClawConfig
+from rragent.tools.registry import GlobalToolRegistry
+from rragent.tools.executor import ToolExecutor
+from rragent.tools.pyagent.bridge import PyAgentBridge
+from rragent.tools.index_builder import build_tool_registry
+from rragent.context.engine import ContextEngine
+from rragent.runtime.prompt import PromptBuilder
+from rragent.channels.gateway import GatewayChannel
 
 # Config
 GATEWAY_URL = os.getenv("GATEWAY_URL", "ws://127.0.0.1:18789")
@@ -65,7 +65,7 @@ def build_provider_router() -> ProviderRouter:
     # Primary: DashScope (qwen3.5-plus)
     primary_key = os.getenv("OPENAI_API_KEY", "")
     primary_url = os.getenv("OPENAI_BASE_URL", "https://coding.dashscope.aliyuncs.com/v1")
-    primary_model = os.getenv("RRCLAW_DEFAULT_MODEL", "qwen3.5-plus")
+    primary_model = os.getenv("RRAGENT_DEFAULT_MODEL", "qwen3.5-plus")
 
     if primary_key:
         configs.append(ProviderConfig(

@@ -20,13 +20,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import websockets
 from websockets.exceptions import ConnectionClosed
 
-from rrclaw.runtime.conversation import ConversationRuntime, TurnConfig, EventType
-from rrclaw.runtime.session import Session
-from rrclaw.tools.base import Tool, ToolSpec, ToolResult
-from rrclaw.tools.registry import GlobalToolRegistry, ToolIndex
-from rrclaw.tools.executor import ToolExecutor
-from rrclaw.channels.gateway import GatewayChannel
-from rrclaw.channels.acp_runtime import ACPRuntime
+from rragent.runtime.conversation import ConversationRuntime, TurnConfig, EventType
+from rragent.runtime.session import Session
+from rragent.tools.base import Tool, ToolSpec, ToolResult
+from rragent.tools.registry import GlobalToolRegistry, ToolIndex
+from rragent.tools.executor import ToolExecutor
+from rragent.channels.gateway import GatewayChannel
+from rragent.channels.acp_runtime import ACPRuntime
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("test_channels")
@@ -165,7 +165,7 @@ async def test_im_gateway():
         raw = await asyncio.wait_for(ws.recv(), timeout=5)
         reg = json.loads(raw)
         assert reg["type"] == "channel.register", f"Expected register, got {reg['type']}"
-        assert reg["channel"] == "rrclaw"
+        assert reg["channel"] == "rragent"
         print(f"  ✓ Gateway received registration: channel={reg['channel']}")
         print(f"    Capabilities: {', '.join(reg.get('capabilities', [])[:5])}...")
 
@@ -227,7 +227,7 @@ async def test_im_gateway():
 
     gateway = GatewayChannel(
         gateway_url=f"ws://127.0.0.1:{gateway_port}",
-        agent_id="rrclaw",
+        agent_id="rragent",
         on_user_message=handle_user_message,
     )
 

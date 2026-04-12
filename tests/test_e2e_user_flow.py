@@ -360,7 +360,7 @@ async def test_scenario_1_realtime_market():
     print("  用户: 今天行情怎么样？涨停板有哪些半导体？")
     print("=" * 60)
 
-    from rrclaw.tools.mcp.reachrich_server import ReachRichMCPServer
+    from rragent.tools.mcp.reachrich_server import ReachRichMCPServer
 
     server = ReachRichMCPServer()
     server._bridge_client = MockBridgeClient()
@@ -436,7 +436,7 @@ async def test_scenario_2_strategy_screening():
     print("  用户: 帮我用半导体动量策略选股，给我分析一下结果")
     print("=" * 60)
 
-    from rrclaw.tools.mcp.reachrich_server import ReachRichMCPServer
+    from rragent.tools.mcp.reachrich_server import ReachRichMCPServer
 
     server = ReachRichMCPServer()
     server._bridge_client = MockBridgeClient()
@@ -552,7 +552,7 @@ async def test_scenario_3_realtime_stream():
     print("  模拟: data_factory → Redis Pub/Sub → RRCLAW StreamConsumer")
     print("=" * 60)
 
-    from rrclaw.data_sources.reachrich_stream import (
+    from rragent.data_sources.reachrich_stream import (
         ReachRichStreamConsumer, ReachRichStreamConfig, StreamMessage,
         CHANNEL_QUOTES, CHANNEL_HOT, CHANNEL_CONCEPTS,
     )
@@ -658,7 +658,7 @@ async def test_scenario_4_mcp_protocol():
     print("  模拟: Claude Desktop → MCP JSON-RPC → RRCLAW MCP Server")
     print("=" * 60)
 
-    from rrclaw.tools.mcp.reachrich_server import ReachRichMCPServer
+    from rragent.tools.mcp.reachrich_server import ReachRichMCPServer
 
     server = ReachRichMCPServer()
     server._bridge_client = MockBridgeClient()
@@ -738,8 +738,8 @@ async def test_scenario_5_full_user_session():
     print("  用户: 看看大盘，然后用半导体策略选几只票")
     print("=" * 60)
 
-    from rrclaw.tools.mcp.reachrich_server import ReachRichMCPServer
-    from rrclaw.data_sources.reachrich_stream import (
+    from rragent.tools.mcp.reachrich_server import ReachRichMCPServer
+    from rragent.data_sources.reachrich_stream import (
         ReachRichStreamConsumer, ReachRichStreamConfig,
         CHANNEL_QUOTES,
     )

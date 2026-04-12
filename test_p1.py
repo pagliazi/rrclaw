@@ -11,14 +11,14 @@ import os
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from rrclaw.tools.registry import GlobalToolRegistry, ToolIndex
-from rrclaw.tools.search import ToolSearchTool
-from rrclaw.tools.pyagent.bridge import PyAgentBridge, PyAgentTool, PYAGENT_COMMANDS
-from rrclaw.tools.index_builder import build_tool_registry
-from rrclaw.runtime.prompt import PromptBuilder
-from rrclaw.runtime.config import RRClawConfig
-from rrclaw.context.engine import ContextEngine
-from rrclaw.runtime.session import Session
+from rragent.tools.registry import GlobalToolRegistry, ToolIndex
+from rragent.tools.search import ToolSearchTool
+from rragent.tools.pyagent.bridge import PyAgentBridge, PyAgentTool, PYAGENT_COMMANDS
+from rragent.tools.index_builder import build_tool_registry
+from rragent.runtime.prompt import PromptBuilder
+from rragent.runtime.config import RRClawConfig
+from rragent.context.engine import ContextEngine
+from rragent.runtime.session import Session
 
 SKILLS_DIR = os.path.expanduser(
     "~/OpenClaw-Universe/openclaw-brain/agents/skills"

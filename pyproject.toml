@@ -1,5 +1,5 @@
 [project]
-name = "rrclaw"
+name = "rragent"
 version = "0.1.0"
 description = "RRCLAW — unified AI agent harness for A-share quantitative trading"
 readme = "README.md"
@@ -53,9 +53,9 @@ full = [
 ]
 
 [project.scripts]
-rrclaw = "rrclaw.__main__:main"
-rrclaw-mcp = "rrclaw.tools.mcp.server:main"
-rrclaw-market = "rrclaw.tools.mcp.reachrich_server:main"
+rragent = "rragent.__main__:main"
+rrclaw-mcp = "rragent.tools.mcp.server:main"
+rrclaw-market = "rragent.tools.mcp.reachrich_server:main"
 
 [project.urls]
 Homepage = "https://github.com/pagliazi/rrclaw"

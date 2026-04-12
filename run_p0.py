@@ -11,19 +11,19 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     datefmt="%H:%M:%S",
 )
-logger = logging.getLogger("rrclaw.p0")
+logger = logging.getLogger("rragent.p0")
 
 # Suppress noisy loggers
 logging.getLogger("websockets").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-from rrclaw.runtime.conversation import ConversationRuntime, TurnConfig, EventType
-from rrclaw.runtime.providers.simple import SimpleLLMProvider
-from rrclaw.runtime.session import Session
-from rrclaw.tools.registry import GlobalToolRegistry
-from rrclaw.tools.executor import ToolExecutor
-from rrclaw.tools.pyagent.bridge import PyAgentBridge, PyAgentTool
-from rrclaw.channels.gateway import GatewayChannel
+from rragent.runtime.conversation import ConversationRuntime, TurnConfig, EventType
+from rragent.runtime.providers.simple import SimpleLLMProvider
+from rragent.runtime.session import Session
+from rragent.tools.registry import GlobalToolRegistry
+from rragent.tools.executor import ToolExecutor
+from rragent.tools.pyagent.bridge import PyAgentBridge, PyAgentTool
+from rragent.channels.gateway import GatewayChannel
 
 # Config
 GATEWAY_URL = os.getenv("GATEWAY_URL", "ws://127.0.0.1:18789")

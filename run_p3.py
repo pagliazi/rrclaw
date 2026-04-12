@@ -20,46 +20,46 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     datefmt="%H:%M:%S",
 )
-logger = logging.getLogger("rrclaw.p3")
+logger = logging.getLogger("rragent.p3")
 
 # Suppress noisy loggers
 logging.getLogger("websockets").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-from rrclaw.runtime.conversation import ConversationRuntime, TurnConfig, EventType
-from rrclaw.runtime.providers.router import ProviderRouter, ProviderConfig
-from rrclaw.runtime.resilience.error_classifier import RRClawErrorClassifier
-from rrclaw.runtime.session import Session
-from rrclaw.runtime.config import RRClawConfig
-from rrclaw.tools.registry import GlobalToolRegistry
-from rrclaw.tools.executor import ToolExecutor
-from rrclaw.tools.pyagent.bridge import PyAgentBridge
-from rrclaw.tools.index_builder import build_tool_registry
-from rrclaw.context.engine import ContextEngine
-from rrclaw.runtime.prompt import PromptBuilder
-from rrclaw.channels.gateway import GatewayChannel
+from rragent.runtime.conversation import ConversationRuntime, TurnConfig, EventType
+from rragent.runtime.providers.router import ProviderRouter, ProviderConfig
+from rragent.runtime.resilience.error_classifier import RRClawErrorClassifier
+from rragent.runtime.session import Session
+from rragent.runtime.config import RRClawConfig
+from rragent.tools.registry import GlobalToolRegistry
+from rragent.tools.executor import ToolExecutor
+from rragent.tools.pyagent.bridge import PyAgentBridge
+from rragent.tools.index_builder import build_tool_registry
+from rragent.context.engine import ContextEngine
+from rragent.runtime.prompt import PromptBuilder
+from rragent.channels.gateway import GatewayChannel
 
 # P3 imports
-from rrclaw.tools.hermes.runtime import HermesNativeRuntime
-from rrclaw.evolution.background_review import BackgroundReviewSystem
-from rrclaw.evolution.engine import EvolutionEngine
-from rrclaw.skills.loader import SkillLoader
-from rrclaw.skills.executor import SkillExecutor
-from rrclaw.context.memory.tier1_session import SessionMemory
-from rrclaw.context.memory.tier2_user import UserMemory
-from rrclaw.context.memory.tier3_system import SystemMemory
+from rragent.tools.hermes.runtime import HermesNativeRuntime
+from rragent.evolution.background_review import BackgroundReviewSystem
+from rragent.evolution.engine import EvolutionEngine
+from rragent.skills.loader import SkillLoader
+from rragent.skills.executor import SkillExecutor
+from rragent.context.memory.tier1_session import SessionMemory
+from rragent.context.memory.tier2_user import UserMemory
+from rragent.context.memory.tier3_system import SystemMemory
 
 # P4 imports
-from rrclaw.evolution.gepa_pipeline import GEPAPipeline
-from rrclaw.evolution.autoresearch_loop import StrategyResearchLoop
-from rrclaw.workers.boot import RedisWorker, PyAgentWorker, HermesWorker, GatewayWorker
-from rrclaw.workers.coordinator import WorkerCoordinator
-from rrclaw.commands.evolve import EvolveCommand
-from rrclaw.commands.research import ResearchCommand
+from rragent.evolution.gepa_pipeline import GEPAPipeline
+from rragent.evolution.autoresearch_loop import StrategyResearchLoop
+from rragent.workers.boot import RedisWorker, PyAgentWorker, HermesWorker, GatewayWorker
+from rragent.workers.coordinator import WorkerCoordinator
+from rragent.commands.evolve import EvolveCommand
+from rragent.commands.research import ResearchCommand
 
 # P5 imports
-from rrclaw.tools.builtin.canvas import CanvasTool
-from rrclaw.channels.acp_runtime import ACPRuntime
+from rragent.tools.builtin.canvas import CanvasTool
+from rragent.channels.acp_runtime import ACPRuntime
 
 # Config
 GATEWAY_URL = os.getenv("GATEWAY_URL", "ws://127.0.0.1:18789")
@@ -109,7 +109,7 @@ def build_provider_router() -> ProviderRouter:
     # Primary: DashScope (qwen3.5-plus)
     primary_key = os.getenv("OPENAI_API_KEY", "")
     primary_url = os.getenv("OPENAI_BASE_URL", "https://coding.dashscope.aliyuncs.com/v1")
-    primary_model = os.getenv("RRCLAW_DEFAULT_MODEL", "qwen3.5-plus")
+    primary_model = os.getenv("RRAGENT_DEFAULT_MODEL", "qwen3.5-plus")
 
     if primary_key:
         configs.append(ProviderConfig(
@@ -334,7 +334,7 @@ async def main():
     # 2. Hermes runtime (P3)
     hermes_runtime = HermesNativeRuntime(
         hermes_path="/tmp/full-deploy-test/hermes-venv",
-        model=os.getenv("RRCLAW_DEFAULT_MODEL", "qwen3.5-plus"),
+        model=os.getenv("RRAGENT_DEFAULT_MODEL", "qwen3.5-plus"),
     )
     if hermes_runtime.available:
         logger.info("Hermes runtime loaded")
@@ -526,12 +526,12 @@ async def main():
             acp_runtime = None
 
     # 13. Main loop — Redis orchestrator mode, Gateway mode, or stdin mode
-    redis_mode = os.getenv("RRCLAW_REDIS_MODE", "").lower() == "true"
+    redis_mode = os.getenv("RRAGENT_REDIS_MODE", "").lower() == "true"
 
     if redis_mode and pyagent_bridge and pyagent_bridge.is_connected:
         # --- RRCLAW 替代 orchestrator：直接订阅 Redis 频道处理 IM 消息 ---
         import redis.asyncio as aioredis
-        listen_channel = os.getenv("RRCLAW_LISTEN_CHANNEL", "openclaw:orchestrator")
+        listen_channel = os.getenv("RRAGENT_LISTEN_CHANNEL", "openclaw:orchestrator")
         r = aioredis.from_url(REDIS_URL, decode_responses=True)
         pubsub = r.pubsub()
         await pubsub.subscribe(listen_channel)
@@ -591,7 +591,7 @@ async def main():
                         "type": "done",
                         "text": full_text,
                         "in_reply_to": msg_id,
-                        "source": "rrclaw",
+                        "source": "rragent",
                         "timestamp": time.time(),
                     }, ensure_ascii=False))
                     logger.info(f"Reply [{uid[:8]}]: {full_text[:80]}...")

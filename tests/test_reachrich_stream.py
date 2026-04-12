@@ -25,7 +25,7 @@ except ImportError:
     pytest = None
     _asyncio_mark = lambda f: f  # no-op decorator when pytest unavailable
 
-from rrclaw.data_sources.reachrich_stream import (
+from rragent.data_sources.reachrich_stream import (
     ReachRichStreamConsumer,
     ReachRichStreamConfig,
     ReachRichPublisher,
@@ -248,7 +248,7 @@ async def test_publisher_consumer_roundtrip():
 
 def test_mcp_tools_match_bridge_client():
     """MCP server tool schemas should match BridgeClient's actual method signatures."""
-    from rrclaw.tools.mcp.reachrich_server import ReachRichMCPServer
+    from rragent.tools.mcp.reachrich_server import ReachRichMCPServer
 
     srv = ReachRichMCPServer()
 
@@ -295,7 +295,7 @@ def test_config_env_overrides():
     os.environ["BRIDGE_CLIENT_PATH"] = "/opt/openclaw/agents"
 
     try:
-        from rrclaw.runtime.config import load_config
+        from rragent.runtime.config import load_config
         cfg = load_config()
 
         assert cfg["reachrich"]["base_url"] == "http://192.168.1.100:8001/api/bridge"
