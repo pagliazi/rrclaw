@@ -115,7 +115,7 @@ function UserMenu({user, onLogout, onViewChange}) {
 
 // ── Nav Rail (collapsible left sidebar with labels) ───
 
-function NavRail({currentView, onViewChange, agents, user, onLogout}) {
+function NavRail({currentView, onViewChange, agents, user, onLogout, splitView, onToggleSplit}) {
   const [collapsed, setCollapsed] = React.useState(false);
   const activeCount = Object.values(agents).filter(a=>a.status==='online'||a.status==='slow').length;
   const totalCount = Object.keys(agents).filter(n=>agents[n].status!=='sleeping').length;
@@ -187,22 +187,31 @@ function NavRail({currentView, onViewChange, agents, user, onLogout}) {
         })}
       </nav>
 
-      <div className={`flex ${collapsed ? 'flex-col items-center gap-2' : 'flex-row items-center justify-between px-3'} mt-2 pt-2.5 border-t border-border/40`}>
-        {collapsed ? (
-          <>
-            <div className="text-[9px] text-zinc-600 font-medium tabular-nums">{activeCount}/{totalCount}</div>
-            <div className={`w-2 h-2 rounded-full ${activeCount > 0 ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,.4)] pulse-ring text-emerald-400' : 'bg-zinc-600'}`}></div>
-            {user && <UserMenu user={user} onLogout={onLogout} onViewChange={onViewChange} />}
-          </>
-        ) : (
-          <>
-            <div className="flex items-center gap-2 bg-surface-2/50 rounded-lg px-2 py-1">
-              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeCount > 0 ? 'bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,.5)]' : 'bg-zinc-600'}`}></div>
-              <span className="text-[10px] text-zinc-500 tabular-nums font-medium">{activeCount}/{totalCount} 在线</span>
-            </div>
-            {user && <UserMenu user={user} onLogout={onLogout} onViewChange={onViewChange} />}
-          </>
+      <div className={`flex ${collapsed ? 'flex-col items-center gap-2' : 'flex-col gap-2 px-3'} mt-2 pt-2.5 border-t border-border/40`}>
+        {onToggleSplit && (
+          <button onClick={onToggleSplit} title={splitView ? '关闭分屏' : '开启分屏'}
+            className={`flex items-center justify-center gap-1.5 ${collapsed ? 'w-8 h-8' : 'w-full py-1.5 px-2'} rounded-lg text-[10px] transition-all ${splitView ? 'bg-brand-600/20 text-brand-400 border border-brand-500/30' : 'bg-surface-2 text-zinc-500 border border-border hover:border-border-light hover:text-zinc-300'}`}>
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+            {!collapsed && <span>{splitView ? '分屏' : '分屏'}</span>}
+          </button>
         )}
+        <div className={`flex ${collapsed ? 'flex-col items-center gap-2' : 'flex-row items-center justify-between'}`}>
+          {collapsed ? (
+            <>
+              <div className="text-[9px] text-zinc-600 font-medium tabular-nums">{activeCount}/{totalCount}</div>
+              <div className={`w-2 h-2 rounded-full ${activeCount > 0 ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,.4)] pulse-ring text-emerald-400' : 'bg-zinc-600'}`}></div>
+              {user && <UserMenu user={user} onLogout={onLogout} onViewChange={onViewChange} />}
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 bg-surface-2/50 rounded-lg px-2 py-1">
+                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeCount > 0 ? 'bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,.5)]' : 'bg-zinc-600'}`}></div>
+                <span className="text-[10px] text-zinc-500 tabular-nums font-medium">{activeCount}/{totalCount} 在线</span>
+              </div>
+              {user && <UserMenu user={user} onLogout={onLogout} onViewChange={onViewChange} />}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

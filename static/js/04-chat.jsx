@@ -44,6 +44,81 @@ function ChatSidebar({conversations, activeId, onSelect, onCreate, onDelete, col
 }
 
 
+// ── Tool Call Card ───────────────────────────────────
+
+function ToolCallCard({tool}) {
+  const [expanded, setExpanded] = useState(false);
+  const statusIcon = tool.status === 'running' ? null : tool.status === 'error' ? '✗' : '✓';
+  const statusColor = tool.status === 'running' ? 'border-brand-500/40 bg-brand-600/5' : tool.status === 'error' ? 'border-red-500/30 bg-red-500/5' : 'border-emerald-500/30 bg-emerald-500/5';
+  const headerColor = tool.status === 'running' ? 'text-brand-400' : tool.status === 'error' ? 'text-red-400' : 'text-emerald-400';
+  const duration = tool.duration != null ? (tool.duration / 1000).toFixed(1) + 's' : tool.status === 'running' ? '...' : '';
+  const contentLen = tool.content ? tool.content.length.toLocaleString() + ' chars' : '';
+
+  return (
+    <div className={`my-2 rounded-xl border ${statusColor} overflow-hidden animate-fade-in transition-all`}>
+      <button onClick={() => tool.content && setExpanded(!expanded)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-3/30 transition">
+        <span className="text-xs">🔧</span>
+        {tool.status === 'running' ? (
+          <span className="flex-shrink-0"><Spinner size={3} /></span>
+        ) : (
+          <span className={`text-xs font-bold ${headerColor} flex-shrink-0`}>{statusIcon}</span>
+        )}
+        <span className="text-[12px] font-mono text-zinc-300 truncate flex-1">{tool.name || 'tool'}</span>
+        {duration && <span className="text-[10px] text-zinc-500 tabular-nums flex-shrink-0">{duration}</span>}
+        {tool.status !== 'running' && contentLen && (
+          <span className="text-[10px] text-zinc-600 flex-shrink-0">{contentLen}</span>
+        )}
+        {tool.content && (
+          <span className={`text-[10px] ${headerColor} flex-shrink-0`}>{expanded ? '收起 ▴' : '展开 ▾'}</span>
+        )}
+      </button>
+      {expanded && tool.content && (
+        <div className="px-3 pb-2 border-t border-border/30">
+          <pre className="text-[10px] text-zinc-400 font-mono leading-[1.5] overflow-auto max-h-[200px] mt-1.5 whitespace-pre-wrap break-all">{
+            tool.content.length > 2000 ? tool.content.slice(0, 2000) + '\n... (' + tool.content.length.toLocaleString() + ' chars total)' : tool.content
+          }</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Token Counter ────────────────────────────────────
+
+function TokenCounter({tokenSession}) {
+  if (!tokenSession || (tokenSession.inputTokens === 0 && tokenSession.outputTokens === 0)) return null;
+  const info = formatTokenCost(tokenSession);
+  return (
+    <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 tabular-nums bg-surface-2/60 rounded-lg px-2 py-1 border border-border/40">
+      <span className="text-zinc-400">Tokens:</span>
+      <span className="text-zinc-300">{info.inStr}</span>
+      <span className="text-zinc-600">in</span>
+      <span className="text-zinc-600">+</span>
+      <span className="text-zinc-300">{info.outStr}</span>
+      <span className="text-zinc-600">out</span>
+      <span className="text-zinc-700 mx-0.5">|</span>
+      <span className="text-amber-500/80">¥{info.costStr}</span>
+      <span className="text-zinc-700 mx-0.5">|</span>
+      <span className="text-zinc-500">{info.model}</span>
+    </div>
+  );
+}
+
+// ── Thinking Indicator ──────────────────────────────
+
+function ThinkingBubble({text}) {
+  if (!text) return null;
+  return (
+    <div className="my-1 px-3 py-1.5 bg-brand-600/5 border border-brand-500/15 rounded-lg animate-fade-in">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] text-brand-400/70">💭 思考中</span>
+      </div>
+      <pre className="text-[10px] text-zinc-500 font-mono leading-[1.4] mt-0.5 whitespace-pre-wrap max-h-16 overflow-hidden">{text.slice(0, 200)}{text.length > 200 ? '...' : ''}</pre>
+    </div>
+  );
+}
+
 // ── Chat View ────────────────────────────────────────
 
 function TypingIndicator() {
@@ -172,7 +247,7 @@ function MentionPopup({filter, onSelect, position}) {
   );
 }
 
-function ChatView({conversations, activeConvId, messages, onSend, isThinking, chatTarget, onChatTargetChange, sidebarCollapsed, onToggleSidebar, onNewConv, onSelectConv, onDeleteConv, agents}) {
+function ChatView({conversations, activeConvId, messages, onSend, isThinking, chatTarget, onChatTargetChange, sidebarCollapsed, onToggleSidebar, onNewConv, onSelectConv, onDeleteConv, agents, activeToolCalls, thinkingText, tokenSession}) {
   const [input, setInput] = useState('');
   const [showMention, setShowMention] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
@@ -221,6 +296,9 @@ function ChatView({conversations, activeConvId, messages, onSend, isThinking, ch
           )}
           <TargetSelector chatTarget={chatTarget} onChatTargetChange={onChatTargetChange} agents={agents} />
           <span className="text-[11px] text-zinc-600 hidden md:inline">@agent 切换对话对象</span>
+          <div className="ml-auto hidden md:block">
+            <TokenCounter tokenSession={tokenSession} />
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -249,9 +327,15 @@ function ChatView({conversations, activeConvId, messages, onSend, isThinking, ch
             <div className="animate-slide-up flex justify-start mb-5">
               <div className="flex gap-3">
                 <div className="w-8 h-8 rounded-xl bg-brand-600/15 flex items-center justify-center text-sm flex-shrink-0">{thinkingAgent.icon}</div>
-                <div>
+                <div className="min-w-0 max-w-[65%]">
                   <div className="text-[11px] text-zinc-500 mb-1">{thinkingAgent.label} 思考中...</div>
-                  <div className="rounded-2xl rounded-tl-md bg-surface-2 border border-border px-4 py-3.5">
+                  {thinkingText && <ThinkingBubble text={thinkingText} />}
+                  {activeToolCalls && activeToolCalls.length > 0 && (
+                    <div className="space-y-0.5">
+                      {activeToolCalls.map((tc, i) => <ToolCallCard key={tc.name + '_' + i} tool={tc} />)}
+                    </div>
+                  )}
+                  <div className="rounded-2xl rounded-tl-md bg-surface-2 border border-border px-4 py-3.5 mt-1">
                     <TypingIndicator />
                   </div>
                 </div>

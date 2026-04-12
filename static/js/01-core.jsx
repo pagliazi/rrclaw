@@ -154,7 +154,10 @@ function streamChat(message, target, onEvent) {
       var buffer = '';
       function pump() {
         return reader.read().then(function(result) {
-          if (result.done) return;
+          if (result.done) {
+            onEvent({type:'done'});
+            return;
+          }
           buffer += decoder.decode(result.value, {stream:true});
           var lines = buffer.split('\n');
           buffer = lines.pop() || '';
@@ -168,6 +171,31 @@ function streamChat(message, target, onEvent) {
       }
       return pump();
     });
+}
+
+// ── Token/Cost tracking helpers ─────────────────────
+function createTokenSession() {
+  return { inputTokens: 0, outputTokens: 0, model: '' };
+}
+
+function updateTokenSession(session, usage) {
+  return {
+    inputTokens: session.inputTokens + (usage.input_tokens || 0),
+    outputTokens: session.outputTokens + (usage.output_tokens || 0),
+    model: usage.model || session.model,
+  };
+}
+
+function formatTokenCost(session) {
+  // Rough estimate: qwen ~0.002 yuan per 1k tokens
+  const totalTokens = session.inputTokens + session.outputTokens;
+  const costYuan = totalTokens * 0.000002;
+  return {
+    inStr: session.inputTokens.toLocaleString(),
+    outStr: session.outputTokens.toLocaleString(),
+    costStr: costYuan < 0.01 ? costYuan.toFixed(4) : costYuan.toFixed(2),
+    model: session.model || 'unknown',
+  };
 }
 
 function genId() { return 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }

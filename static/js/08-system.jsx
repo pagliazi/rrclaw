@@ -343,6 +343,103 @@ function AgentSkillsView() {
 }
 
 
+function SystemStatusCards() {
+  const [usage, setUsage] = useState(null);
+  const [llmConfig, setLlmConfig] = useState(null);
+  const [diag, setDiag] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const [u, c, d] = await Promise.all([
+        apiGet('/api/usage?days=1&recent=5').catch(() => null),
+        apiGet('/api/llm/config').catch(() => null),
+        apiGet('/api/diagnostics').catch(() => null),
+      ]);
+      if (u && !u.error) setUsage(u);
+      if (c && !c.error) setLlmConfig(c);
+      if (d && !d.error) setDiag(d);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const totals = usage?.totals || {};
+  const byProvider = usage?.by_provider || {};
+  const providerCount = Object.keys(byProvider).length;
+  const agentHealthy = diag?.agents ? Object.values(diag.agents).filter(a => a.status === 'online' || a.status === 'ok').length : 0;
+  const agentTotal = diag?.agents ? Object.keys(diag.agents).length : 0;
+
+  if (loading) return <SkeletonBlock lines={2} />;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      {/* API Usage Summary */}
+      <Card className="!p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-base">📊</span>
+          <h4 className="text-[13px] font-medium text-zinc-200">今日 API</h4>
+        </div>
+        <div className="space-y-1 text-[12px]">
+          <div className="flex justify-between"><span className="text-zinc-500">调用次数</span><span className="text-zinc-200 font-medium">{(totals.total_calls||0).toLocaleString()}</span></div>
+          <div className="flex justify-between"><span className="text-zinc-500">费用</span><span className="text-amber-400 font-medium">¥{(totals.total_cost_yuan||0).toFixed(2)}</span></div>
+          {providerCount > 0 && (
+            <div className="pt-1 border-t border-border/40 mt-1">
+              <div className="text-[10px] text-zinc-600 mb-1">按 Provider:</div>
+              {Object.entries(byProvider).slice(0, 3).map(([name, d]) => (
+                <div key={name} className="flex justify-between text-[10px]">
+                  <span className="text-zinc-500 truncate">{name}</span>
+                  <span className="text-zinc-400 tabular-nums">{(d.calls||0)} 次</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Provider Status */}
+      <Card className="!p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-base">🔌</span>
+          <h4 className="text-[13px] font-medium text-zinc-200">Provider 状态</h4>
+        </div>
+        <div className="space-y-1 text-[12px]">
+          {llmConfig?.providers ? Object.entries(llmConfig.providers).slice(0, 4).map(([name, info]) => (
+            <div key={name} className="flex items-center justify-between">
+              <span className="text-zinc-400 truncate">{name}</span>
+              <StatusDot status={info.enabled !== false ? 'online' : 'offline'} />
+            </div>
+          )) : (
+            <div className="text-zinc-600 text-[11px]">无配置数据</div>
+          )}
+          {llmConfig?.default_provider && (
+            <div className="pt-1 border-t border-border/40 mt-1 text-[10px] text-zinc-500">
+              默认: <span className="text-brand-400">{llmConfig.default_provider}</span>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Evolution / Diagnostics */}
+      <Card className="!p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-base">🧬</span>
+          <h4 className="text-[13px] font-medium text-zinc-200">引擎状态</h4>
+        </div>
+        <div className="space-y-1 text-[12px]">
+          <div className="flex justify-between"><span className="text-zinc-500">Agent 健康</span><span className={`font-medium ${agentHealthy === agentTotal ? 'text-emerald-400' : 'text-amber-400'}`}>{agentHealthy}/{agentTotal}</span></div>
+          <div className="flex justify-between"><span className="text-zinc-500">Redis</span><StatusDot status={diag?.redis?.ping ? 'online' : 'offline'} /></div>
+          <div className="flex justify-between"><span className="text-zinc-500">记忆</span><span className="text-zinc-300">{diag?.memory?.session_count ?? '?'} 会话</span></div>
+          {diag?.redis?.used_memory_human && (
+            <div className="flex justify-between"><span className="text-zinc-500">Redis 内存</span><span className="text-zinc-400">{diag.redis.used_memory_human}</span></div>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function SystemView() {
   const panels = [{title:'LLM 路由',icon:'🤖',cmd:'llm_status'},{title:'Embedding',icon:'🧠',cmd:'embed_status'},{title:'数据源',icon:'📡',cmd:'data_source_status'},{title:'SOUL 守护',icon:'🛡️',cmd:'soul_check'},{title:'记忆健康',icon:'💊',cmd:'memory_health'},{title:'记忆卫生',icon:'🧹',cmd:'memory_hygiene'}];
   const [results, setResults] = useState({});
@@ -359,6 +456,7 @@ function SystemView() {
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-4 animate-fade-in">
       <div className="flex items-center justify-between mb-1"><h1 className="text-xl font-bold text-white">系统状态</h1><button onClick={refreshAll} className="btn px-3 py-1.5 bg-surface-2 hover:bg-surface-3 rounded-lg text-[12px] text-zinc-400 border border-border hover:border-border-light transition">全部刷新</button></div>
+      <SystemStatusCards />
       <LLMConfigPanel />
       <div className="grid md:grid-cols-2 gap-4">{panels.map(p => (<Card key={p.cmd}><div className="flex items-center justify-between mb-3"><h3 className="text-sm font-medium text-zinc-200">{p.icon} {p.title}</h3><button onClick={()=>refresh(p.cmd)} className="btn px-2 py-1 text-[11px] text-brand-400 hover:text-brand-300 hover:bg-brand-600/10 rounded-lg transition">{loading[p.cmd] ? <Spinner /> : '刷新'}</button></div><div className="max-h-52 overflow-auto"><DataBlock data={results[p.cmd]} loading={loading[p.cmd]} placeholder="点击刷新获取数据" /></div></Card>))}</div>
       <Card><h3 className="text-sm font-medium text-zinc-200 mb-3">🔧 自定义命令</h3><div className="flex gap-2"><input value={customCmd} onChange={e=>setCustomCmd(e.target.value)} placeholder="命令" className="w-28 bg-surface-3 border border-border rounded-xl px-3 py-2.5 text-sm text-zinc-300 focus:outline-none focus:border-brand-500/40 transition" /><input value={customArgs} onChange={e=>setCustomArgs(e.target.value)} placeholder="参数" onKeyDown={e=>e.key==='Enter'&&runCustom()} className="flex-1 bg-surface-3 border border-border rounded-xl px-3 py-2.5 text-sm text-zinc-300 focus:outline-none focus:border-brand-500/40 transition" /><button onClick={runCustom} disabled={customLoading} className="btn px-4 py-2.5 bg-surface-3 hover:bg-surface-4 rounded-xl text-sm text-zinc-300 border border-border hover:border-border-light transition disabled:opacity-50">{customLoading ? <Spinner /> : '执行'}</button></div>{(customResult || customLoading) && (<div className="mt-3 pt-3 border-t border-border max-h-64 overflow-auto"><DataBlock data={customResult} loading={customLoading} /></div>)}</Card>

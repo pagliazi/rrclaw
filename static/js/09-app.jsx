@@ -9,6 +9,11 @@ function App() {
   const [chatTarget, setChatTarget] = useState('manager');
   const [isThinking, setIsThinking] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [splitView, setSplitView] = useState(false);
+  const [splitPanel, setSplitPanel] = useState('system');
+  const [tokenSession, setTokenSession] = useState(() => createTokenSession());
+  const [activeToolCalls, setActiveToolCalls] = useState([]);
+  const [thinkingText, setThinkingText] = useState('');
   const pendingSend = useRef(null);
 
   useEffect(() => {
@@ -131,12 +136,33 @@ function App() {
       updatedAt: Date.now(),
     } : c));
     setIsThinking(true);
+    setActiveToolCalls([]);
+    setThinkingText('');
 
     let fullContent = '';
     let source = target;
+    const toolTimers = {};
     try {
       await streamChat(actualText, target, function(event) {
         if (event.type === 'chunk') fullContent += event.content;
+        else if (event.type === 'thinking') {
+          setThinkingText(prev => prev + (event.content || ''));
+        }
+        else if (event.type === 'tool_start') {
+          toolTimers[event.name] = Date.now();
+          setActiveToolCalls(prev => [...prev, {name: event.name, status: 'running', startTime: Date.now(), content: null, duration: null}]);
+        }
+        else if (event.type === 'tool_result') {
+          const elapsed = toolTimers[event.name] ? Date.now() - toolTimers[event.name] : null;
+          setActiveToolCalls(prev => prev.map(tc =>
+            tc.name === event.name && tc.status === 'running'
+              ? {...tc, status: event.is_error ? 'error' : 'done', content: event.content || '', duration: elapsed}
+              : tc
+          ));
+        }
+        else if (event.type === 'usage') {
+          setTokenSession(prev => updateTokenSession(prev, event));
+        }
         else if (event.type === 'error') fullContent = event.content;
         if (event.source) source = event.source;
       });
@@ -150,6 +176,8 @@ function App() {
       updatedAt: Date.now(),
     } : c));
     setIsThinking(false);
+    setActiveToolCalls([]);
+    setThinkingText('');
   }, [currentView, chatTarget, activeConvId, conversations, createConversation]);
 
   useEffect(() => {
@@ -174,34 +202,62 @@ function App() {
     <ToastProvider>
       <AuthContext.Provider value={authUser}>
         <div className="flex h-screen bg-surface-0">
-          <NavRail currentView={currentView} onViewChange={setCurrentView} agents={agents} user={authUser} onLogout={handleLogout} />
-          <div className="flex-1 flex h-full min-w-0" key={currentView}>
-            {currentView === 'dashboard' && <DashboardView agents={agents} channels={channels} onViewChange={setCurrentView} onSend={canWrite ? handleSend : null} />}
-            {currentView === 'chat' && <ChatView
-              conversations={conversations} activeConvId={activeConvId} messages={activeMessages}
-              onSend={canWrite ? handleSend : null} isThinking={isThinking}
-              chatTarget={chatTarget} onChatTargetChange={setChatTarget}
-              sidebarCollapsed={sidebarCollapsed} onToggleSidebar={()=>setSidebarCollapsed(!sidebarCollapsed)}
-              onNewConv={handleNewConv} onSelectConv={handleSelectConv} onDeleteConv={handleDeleteConv}
-              agents={agents} />}
-            {currentView === 'market' && <MarketView />}
-            {currentView === 'tasks' && <TasksView />}
-            {currentView === 'quant' && <QuantView />}
-            {currentView === 'intraday' && <IntradayView />}
-            {currentView === 'news' && <NewsView />}
-            {currentView === 'tools' && <ToolsView />}
-            {currentView === 'apple' && <AppleView />}
-            {currentView === 'autoresearch' && <AutoResearchView />}
-            {currentView === 'devops' && canWrite && <DevView />}
-            {currentView === 'api_usage' && <ApiUsageView />}
-            {currentView === 'infra_monitor' && <InfraMonitorView />}
-            {currentView === 'agent_skills' && <AgentSkillsView />}
-            {currentView === 'system' && canWrite && <SystemView />}
-            {currentView === 'logs' && <DailyLogView />}
-            {currentView === 'profile' && <ProfileView user={authUser} onUpdateUser={handleUpdateUser} />}
-            {currentView === 'admin' && authUser.role === 'admin' && <AdminView currentUser={authUser} />}
-            {(currentView === 'system' || currentView === 'devops') && !canWrite && (
-              <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">访客无权访问此页面</div>
+          <NavRail currentView={currentView} onViewChange={(v) => { setCurrentView(v); if (v !== 'chat' && v !== 'dashboard') setSplitPanel(v); }} agents={agents} user={authUser} onLogout={handleLogout} splitView={splitView} onToggleSplit={() => setSplitView(!splitView)} />
+          <div className="flex-1 flex h-full min-w-0" key={splitView ? 'split' : currentView}>
+            {splitView && currentView === 'chat' ? (
+              <>
+                <div className="flex-1 flex h-full min-w-0 border-r border-border">
+                  <ChatView
+                    conversations={conversations} activeConvId={activeConvId} messages={activeMessages}
+                    onSend={canWrite ? handleSend : null} isThinking={isThinking}
+                    chatTarget={chatTarget} onChatTargetChange={setChatTarget}
+                    sidebarCollapsed={sidebarCollapsed} onToggleSidebar={()=>setSidebarCollapsed(!sidebarCollapsed)}
+                    onNewConv={handleNewConv} onSelectConv={handleSelectConv} onDeleteConv={handleDeleteConv}
+                    agents={agents} activeToolCalls={activeToolCalls} thinkingText={thinkingText} tokenSession={tokenSession} />
+                </div>
+                <div className="w-[45%] flex h-full min-w-0 overflow-hidden">
+                  {splitPanel === 'system' && canWrite && <SystemView />}
+                  {splitPanel === 'quant' && <QuantView />}
+                  {splitPanel === 'market' && <MarketView />}
+                  {splitPanel === 'api_usage' && <ApiUsageView />}
+                  {splitPanel === 'infra_monitor' && <InfraMonitorView />}
+                  {splitPanel === 'agent_skills' && <AgentSkillsView />}
+                  {splitPanel === 'tools' && <ToolsView />}
+                  {splitPanel === 'news' && <NewsView />}
+                  {splitPanel === 'logs' && <DailyLogView />}
+                  {!['system','quant','market','api_usage','infra_monitor','agent_skills','tools','news','logs'].includes(splitPanel) && <SystemView />}
+                </div>
+              </>
+            ) : (
+              <>
+                {currentView === 'dashboard' && <DashboardView agents={agents} channels={channels} onViewChange={setCurrentView} onSend={canWrite ? handleSend : null} />}
+                {currentView === 'chat' && <ChatView
+                  conversations={conversations} activeConvId={activeConvId} messages={activeMessages}
+                  onSend={canWrite ? handleSend : null} isThinking={isThinking}
+                  chatTarget={chatTarget} onChatTargetChange={setChatTarget}
+                  sidebarCollapsed={sidebarCollapsed} onToggleSidebar={()=>setSidebarCollapsed(!sidebarCollapsed)}
+                  onNewConv={handleNewConv} onSelectConv={handleSelectConv} onDeleteConv={handleDeleteConv}
+                  agents={agents} activeToolCalls={activeToolCalls} thinkingText={thinkingText} tokenSession={tokenSession} />}
+                {currentView === 'market' && <MarketView />}
+                {currentView === 'tasks' && <TasksView />}
+                {currentView === 'quant' && <QuantView />}
+                {currentView === 'intraday' && <IntradayView />}
+                {currentView === 'news' && <NewsView />}
+                {currentView === 'tools' && <ToolsView />}
+                {currentView === 'apple' && <AppleView />}
+                {currentView === 'autoresearch' && <AutoResearchView />}
+                {currentView === 'devops' && canWrite && <DevView />}
+                {currentView === 'api_usage' && <ApiUsageView />}
+                {currentView === 'infra_monitor' && <InfraMonitorView />}
+                {currentView === 'agent_skills' && <AgentSkillsView />}
+                {currentView === 'system' && canWrite && <SystemView />}
+                {currentView === 'logs' && <DailyLogView />}
+                {currentView === 'profile' && <ProfileView user={authUser} onUpdateUser={handleUpdateUser} />}
+                {currentView === 'admin' && authUser.role === 'admin' && <AdminView currentUser={authUser} />}
+                {(currentView === 'system' || currentView === 'devops') && !canWrite && (
+                  <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">访客无权访问此页面</div>
+                )}
+              </>
             )}
           </div>
         </div>

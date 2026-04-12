@@ -77,6 +77,41 @@ function DashboardView({agents, channels, onViewChange, onSend}) {
         );
       })}
 
+      {/* RRCLAW Status + Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 animate-slide-up">
+        <Card className="!p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base">🦀</span>
+            <h3 className="text-sm font-semibold text-zinc-200">RRCLAW</h3>
+          </div>
+          <div className="space-y-1.5 text-[12px]">
+            <div className="flex justify-between"><span className="text-zinc-500">ConversationRuntime</span><StatusDot status={onlineCount > 0 ? 'online' : 'offline'} /></div>
+            <div className="flex justify-between"><span className="text-zinc-500">Evolution Engine</span><StatusDot status={onlineCount > 2 ? 'online' : 'offline'} /></div>
+            <div className="flex justify-between"><span className="text-zinc-500">ToolSearch</span><StatusDot status="online" /></div>
+          </div>
+        </Card>
+        <Card className="!p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base">📊</span>
+            <h3 className="text-sm font-semibold text-zinc-200">快速统计</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><div className="text-lg font-bold text-white">{Object.keys(agents).length}</div><div className="text-[10px] text-zinc-500">总工具/Agent</div></div>
+            <div><div className="text-lg font-bold text-white">{onlineCount}</div><div className="text-[10px] text-zinc-500">活跃 Agent</div></div>
+          </div>
+        </Card>
+        <Card className="!p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base">📡</span>
+            <h3 className="text-sm font-semibold text-zinc-200">通道概览</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><div className="text-lg font-bold text-white">{Object.keys(channels).length}</div><div className="text-[10px] text-zinc-500">通道总数</div></div>
+            <div><div className="text-lg font-bold text-white">{Object.values(channels).filter(c=>c.status==='online').length}</div><div className="text-[10px] text-zinc-500">在线通道</div></div>
+          </div>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <h3 className="text-sm font-semibold text-zinc-300 mb-3">⚡ 快速操作</h3>
