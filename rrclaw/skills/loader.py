@@ -56,7 +56,7 @@ class SkillLoader:
     Scans:
     1. Bundled skills: rrclaw/skills/bundled/
     2. User skills: ~/.rrclaw/skills/
-    3. Workspace skills: ~/.openclaw/workspace/skills/
+    3. Workspace skills: ~/.rrclaw/workspace/skills/
 
     Skills are YAML frontmatter + Markdown body files.
     """

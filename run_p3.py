@@ -67,7 +67,7 @@ GATEWAY_TOKEN = os.getenv("GATEWAY_TOKEN", "")
 REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 SKILLS_DIR = os.getenv(
     "OPENCLAW_SKILLS_DIR",
-    os.path.expanduser("~/OpenClaw-Universe/openclaw-brain/agents/skills"),
+    os.path.join(os.getenv("BRAIN_PATH", os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")), "agents/skills"),
 )
 
 # State

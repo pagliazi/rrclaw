@@ -43,6 +43,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 # ── Config ───────────────────────────────────────────────
 
 server_start_time = time.time()
+BRAIN_PATH = os.getenv("BRAIN_PATH", os.path.expanduser("~/OpenClaw-Universe/openclaw-brain"))
 REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 PORT = int(os.getenv("RRCLAW_PORT", "7789"))
 HOST = os.getenv("RRCLAW_HOST", "0.0.0.0")
@@ -53,7 +54,7 @@ AUTH_PASS = os.getenv("WEBCHAT_AUTH_PASS", "")
 N8N_SERVICE_TOKEN = os.getenv("N8N_SERVICE_TOKEN", "openclaw-n8n-2026")
 SKILLS_DIR = os.getenv(
     "OPENCLAW_SKILLS_DIR",
-    os.path.expanduser("~/OpenClaw-Universe/openclaw-brain/agents/skills"),
+    os.path.join(BRAIN_PATH, "agents/skills"),
 )
 REPLY_TIMEOUT = int(os.getenv("REPLY_TIMEOUT", "60"))
 LONG_TIMEOUT = 1500
@@ -1144,7 +1145,7 @@ async def api_digger_start(request: Request):
 async def api_digger_factors(request: Request):
     try:
         import sys
-        brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
+        brain_path = BRAIN_PATH
         if brain_path not in sys.path:
             sys.path.insert(0, brain_path)
         from agents.factor_library import FactorLibrary
@@ -1194,7 +1195,7 @@ async def api_digger_retire(request: Request):
     # Fallback: direct FactorLibrary
     try:
         import sys
-        brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
+        brain_path = BRAIN_PATH
         if brain_path not in sys.path:
             sys.path.insert(0, brain_path)
         from agents.factor_library import FactorLibrary
@@ -1223,7 +1224,7 @@ async def api_digger_combine(request: Request):
         else:
             # Fallback: use FactorLibrary + orchestrator (legacy path)
             import sys
-            brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
+            brain_path = BRAIN_PATH
             if brain_path not in sys.path:
                 sys.path.insert(0, brain_path)
             from agents.factor_library import FactorLibrary
@@ -1317,7 +1318,7 @@ async def api_digger_combine(request: Request):
 async def api_digger_combine_history(limit: int = 20):
     try:
         import sys
-        brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
+        brain_path = BRAIN_PATH
         if brain_path not in sys.path:
             sys.path.insert(0, brain_path)
         from agents.factor_library import FactorLibrary
@@ -1335,7 +1336,7 @@ async def api_digger_combine_history(limit: int = 20):
 async def api_digger_combine_detail(record_id: str):
     try:
         import sys
-        brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
+        brain_path = BRAIN_PATH
         if brain_path not in sys.path:
             sys.path.insert(0, brain_path)
         from agents.factor_library import FactorLibrary
@@ -1503,7 +1504,7 @@ async def api_strategies_list():
     presets = []
     try:
         import sys
-        brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
+        brain_path = BRAIN_PATH
         if brain_path not in sys.path:
             sys.path.insert(0, brain_path)
         from agents.bridge_client import get_bridge_client
@@ -1533,7 +1534,7 @@ async def api_strategy_detail(strategy_id: str):
     if strategy_id.startswith("preset_"):
         try:
             import sys
-            brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
+            brain_path = BRAIN_PATH
             if brain_path not in sys.path:
                 sys.path.insert(0, brain_path)
             from agents.bridge_client import get_bridge_client
@@ -1864,7 +1865,7 @@ async def api_reflect_insight():
 async def api_intraday_status():
     try:
         import sys
-        brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
+        brain_path = BRAIN_PATH
         if brain_path not in sys.path:
             sys.path.insert(0, brain_path)
         from agents.intraday_pipeline import get_intraday_status
@@ -2030,7 +2031,7 @@ async def api_dev_git(request: Request):
 async def api_tasks():
     try:
         import sys
-        brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
+        brain_path = BRAIN_PATH
         if brain_path not in sys.path:
             sys.path.insert(0, brain_path)
         from agents.task_manager import TaskManager, PRESET_TASKS
@@ -2060,7 +2061,7 @@ async def api_task_cancel(task_id: str):
 async def api_task_detail(task_id: str):
     try:
         import sys
-        brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
+        brain_path = BRAIN_PATH
         if brain_path not in sys.path:
             sys.path.insert(0, brain_path)
         from agents.task_manager import TaskManager

@@ -103,7 +103,7 @@ class PromptBuilder:
     def _load_soul(self) -> str:
         """Load SOUL.md if available, otherwise use default."""
         soul_paths = [
-            Path(os.path.expanduser("~/.openclaw/workspace/SOUL.md")),
+            Path(os.path.expanduser("~/.rrclaw/workspace/SOUL.md")),
             Path(os.path.expanduser("~/.rrclaw/SOUL.md")),
         ]
         for path in soul_paths:

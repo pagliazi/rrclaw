@@ -3,7 +3,7 @@ Skill Sync — bidirectional skill synchronization.
 
 Syncs skills between:
 - RRCLAW local (~/.rrclaw/skills/)
-- OpenClaw workspace (~/.openclaw/workspace/skills/)
+- OpenClaw workspace (~/.rrclaw/workspace/skills/)
 - Hermes skills store (if available)
 
 Ensures auto-created skills are available across all systems.
