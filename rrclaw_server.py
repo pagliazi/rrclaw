@@ -502,6 +502,27 @@ async def init_rrclaw():
     # Init default admin user
     await init_default_admin()
 
+    # 14. Heartbeat loop — register RRCLAW as orchestrator in Redis
+    async def _heartbeat_loop():
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(REDIS_URL, decode_responses=True)
+        while True:
+            try:
+                hb = json.dumps({
+                    "ts": time.time(),
+                    "pid": os.getpid(),
+                    "skills": ["chat", "tool_search", "evolve", "research", "digger", "backtest"],
+                    "has_soul": True,
+                    "runtime": "rrclaw",
+                    "tools": len(registry.get_all_active_schemas()) if registry else 0,
+                })
+                await r.hset("openclaw:heartbeats", "orchestrator", hb)
+            except Exception:
+                pass
+            await asyncio.sleep(10)
+
+    asyncio.create_task(_heartbeat_loop())
+
     logger.info("=== RRCLAW Init Complete ===")
 
 

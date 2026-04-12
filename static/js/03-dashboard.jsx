@@ -85,7 +85,7 @@ function DashboardView({agents, channels, onViewChange, onSend}) {
             <h3 className="text-sm font-semibold text-zinc-200">RRCLAW</h3>
           </div>
           <div className="space-y-1.5 text-[12px]">
-            <div className="flex justify-between"><span className="text-zinc-500">ConversationRuntime</span><StatusDot status={onlineCount > 0 ? 'online' : 'offline'} /></div>
+            <div className="flex justify-between"><span className="text-zinc-500">ConversationRuntime</span><StatusDot status={agents.orchestrator && agents.orchestrator.status === 'online' ? 'online' : 'offline'} /></div>
             <div className="flex justify-between"><span className="text-zinc-500">Evolution Engine</span><StatusDot status={onlineCount > 2 ? 'online' : 'offline'} /></div>
             <div className="flex justify-between"><span className="text-zinc-500">ToolSearch</span><StatusDot status="online" /></div>
           </div>
