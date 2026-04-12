@@ -130,7 +130,7 @@ class PyAgentBridge:
         }
 
         channel = f"openclaw:{agent}"
-        reply_channel = f"openclaw:rrclaw"
+        reply_channel = f"openclaw:rragent"
 
         # Subscribe to reply channel before publishing
         pubsub = self._redis.pubsub()
