@@ -1,33 +1,33 @@
-// ── Meme因子中心 (YaoView) ─────────────────────────────
+// ── Meme因子中心 (MemeView) ─────────────────────────────
 
 const YAO_THEME_COLORS = {
-  yao_amplitude_compression: 'text-violet-400',
-  yao_volume_dry_up:         'text-cyan-400',
-  yao_limit_up_momentum:     'text-rose-400',
-  yao_breakout_signal:       'text-amber-400',
-  yao_opening_attack:        'text-orange-400',
-  yao_chip_consolidation:    'text-teal-400',
-  yao_vol_price_resonance:   'text-blue-400',
-  yao_intraday_high_close:   'text-emerald-400',
-  yao_pre_explosion_pattern: 'text-pink-400',
-  yao_gap_follow:            'text-indigo-400',
-  yao_mutation:              'text-zinc-400',
+  meme_amplitude_compression: 'text-violet-400',
+  meme_volume_dry_up:         'text-cyan-400',
+  meme_limit_up_momentum:     'text-rose-400',
+  meme_breakout_signal:       'text-amber-400',
+  meme_opening_attack:        'text-orange-400',
+  meme_chip_consolidation:    'text-teal-400',
+  meme_vol_price_resonance:   'text-blue-400',
+  meme_intraday_high_close:   'text-emerald-400',
+  meme_pre_explosion_pattern: 'text-pink-400',
+  meme_gap_follow:            'text-indigo-400',
+  meme_mutation:              'text-zinc-400',
 };
 const YAO_THEME_BG = {
-  yao_amplitude_compression: 'bg-violet-500/10 border-violet-500/20',
-  yao_volume_dry_up:         'bg-cyan-500/10 border-cyan-500/20',
-  yao_limit_up_momentum:     'bg-rose-500/10 border-rose-500/20',
-  yao_breakout_signal:       'bg-amber-500/10 border-amber-500/20',
-  yao_opening_attack:        'bg-orange-500/10 border-orange-500/20',
-  yao_chip_consolidation:    'bg-teal-500/10 border-teal-500/20',
-  yao_vol_price_resonance:   'bg-blue-500/10 border-blue-500/20',
-  yao_intraday_high_close:   'bg-emerald-500/10 border-emerald-500/20',
-  yao_pre_explosion_pattern: 'bg-pink-500/10 border-pink-500/20',
-  yao_gap_follow:            'bg-indigo-500/10 border-indigo-500/20',
-  yao_mutation:              'bg-zinc-500/10 border-zinc-500/20',
+  meme_amplitude_compression: 'bg-violet-500/10 border-violet-500/20',
+  meme_volume_dry_up:         'bg-cyan-500/10 border-cyan-500/20',
+  meme_limit_up_momentum:     'bg-rose-500/10 border-rose-500/20',
+  meme_breakout_signal:       'bg-amber-500/10 border-amber-500/20',
+  meme_opening_attack:        'bg-orange-500/10 border-orange-500/20',
+  meme_chip_consolidation:    'bg-teal-500/10 border-teal-500/20',
+  meme_vol_price_resonance:   'bg-blue-500/10 border-blue-500/20',
+  meme_intraday_high_close:   'bg-emerald-500/10 border-emerald-500/20',
+  meme_pre_explosion_pattern: 'bg-pink-500/10 border-pink-500/20',
+  meme_gap_follow:            'bg-indigo-500/10 border-indigo-500/20',
+  meme_mutation:              'bg-zinc-500/10 border-zinc-500/20',
 };
 
-function YaoKpiCard({icon, label, value, sub, color, loading}) {
+function MemeKpiCard({icon, label, value, sub, color, loading}) {
   return (
     <div className="bg-surface-2 border border-border rounded-2xl p-4 flex flex-col gap-1 card-hover">
       <div className="flex items-center gap-2 mb-1">
@@ -43,7 +43,7 @@ function YaoKpiCard({icon, label, value, sub, color, loading}) {
   );
 }
 
-function YaoThemeGrid({themes, loading}) {
+function MemeThemeGrid({themes, loading}) {
   if (loading) return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
       {Array(10).fill(0).map((_,i) => <div key={i} className="skeleton h-16 rounded-xl"></div>)}
@@ -80,7 +80,7 @@ function YaoThemeGrid({themes, loading}) {
   );
 }
 
-function YaoFactorTable({factors, loading}) {
+function MemeFactorTable({factors, loading}) {
   if (loading) return <div className="skeleton h-40 rounded-xl w-full"></div>;
   if (!factors || factors.length === 0) return (
     <div className="text-center text-zinc-600 text-sm py-8">
@@ -137,7 +137,7 @@ function YaoFactorTable({factors, loading}) {
   );
 }
 
-function YaoSignalsList({signals, loading}) {
+function MemeSignalsList({signals, loading}) {
   if (loading) return <div className="skeleton h-32 rounded-xl w-full"></div>;
   const stocks = signals?.stocks || [];
   if (stocks.length === 0) return (
@@ -188,7 +188,7 @@ function YaoSignalsList({signals, loading}) {
   );
 }
 
-function YaoIterationTimeline({log, loading}) {
+function MemeIterationTimeline({log, loading}) {
   if (loading) return <div className="skeleton h-24 rounded-xl w-full"></div>;
   if (!log || log.length === 0) return (
     <div className="text-center text-zinc-600 text-sm py-6">暂无迭代记录</div>
@@ -235,7 +235,7 @@ function YaoIterationTimeline({log, loading}) {
   );
 }
 
-function YaoView() {
+function MemeView() {
   const [tab, setTab] = React.useState('overview');
   const [data, setData] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
@@ -353,15 +353,15 @@ function YaoView() {
           <>
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <YaoKpiCard icon="🐉" label="Meme因子" value={summ.total_factors ?? 0}
+              <MemeKpiCard icon="🐉" label="Meme因子" value={summ.total_factors ?? 0}
                 sub={`覆盖 ${summ.total_themes || 0} 个主题`} color="text-rose-400" loading={loading} />
-              <YaoKpiCard icon="🏆" label="最佳 Sharpe" value={summ.best_sharpe > 0 ? summ.best_sharpe?.toFixed(3) : '—'}
+              <MemeKpiCard icon="🏆" label="最佳 Sharpe" value={summ.best_sharpe > 0 ? summ.best_sharpe?.toFixed(3) : '—'}
                 sub={`均值 ${summ.avg_sharpe > 0 ? summ.avg_sharpe?.toFixed(2) : '—'}`}
                 color="text-emerald-400" loading={loading} />
-              <YaoKpiCard icon="🎯" label="最佳胜率" value={summ.best_win_rate > 0 ? (summ.best_win_rate*100).toFixed(1)+'%' : '—'}
+              <MemeKpiCard icon="🎯" label="最佳胜率" value={summ.best_win_rate > 0 ? (summ.best_win_rate*100).toFixed(1)+'%' : '—'}
                 sub={`均值 ${summ.avg_win_rate > 0 ? (summ.avg_win_rate*100).toFixed(1)+'%' : '—'}`}
                 color="text-amber-400" loading={loading} />
-              <YaoKpiCard icon="📊" label="迭代次数" value={data?.iteration_log?.length ?? 0}
+              <MemeKpiCard icon="📊" label="迭代次数" value={data?.iteration_log?.length ?? 0}
                 sub="智能优化轮次" color="text-blue-400" loading={loading} />
             </div>
 
@@ -371,7 +371,7 @@ function YaoView() {
                 <span>🗺️</span> 主题性能热图
                 <span className="text-[10px] text-zinc-600 font-normal ml-1">颜色深度 = 平均 Sharpe</span>
               </h3>
-              <YaoThemeGrid themes={data?.theme_stats} loading={loading} />
+              <MemeThemeGrid themes={data?.theme_stats} loading={loading} />
             </Card>
 
             {/* Top 5 factors preview */}
@@ -379,7 +379,7 @@ function YaoView() {
               <h3 className="text-[12px] font-semibold text-zinc-300 mb-3 flex items-center gap-2">
                 <span>🥇</span> TOP 5 Meme因子
               </h3>
-              <YaoFactorTable factors={(data?.top_factors || []).slice(0,5)} loading={loading} />
+              <MemeFactorTable factors={(data?.top_factors || []).slice(0,5)} loading={loading} />
             </Card>
 
             {/* Latest 5 iteration events */}
@@ -387,7 +387,7 @@ function YaoView() {
               <h3 className="text-[12px] font-semibold text-zinc-300 mb-3 flex items-center gap-2">
                 <span>⚡</span> 最近迭代动态
               </h3>
-              <YaoIterationTimeline log={(data?.iteration_log || []).slice(0,5)} loading={loading} />
+              <MemeIterationTimeline log={(data?.iteration_log || []).slice(0,5)} loading={loading} />
             </Card>
           </>
         )}
@@ -399,14 +399,14 @@ function YaoView() {
               <h3 className="text-[12px] font-semibold text-zinc-300 mb-3 flex items-center gap-2">
                 <span>🗺️</span> 主题分布
               </h3>
-              <YaoThemeGrid themes={data?.theme_stats} loading={loading} />
+              <MemeThemeGrid themes={data?.theme_stats} loading={loading} />
             </Card>
             <Card>
               <h3 className="text-[12px] font-semibold text-zinc-300 mb-3 flex items-center justify-between">
                 <span className="flex items-center gap-2"><span>📋</span> 全部Meme因子 ({data?.top_factors?.length || 0})</span>
                 <span className="text-[10px] text-zinc-600 font-normal">按 Sharpe 降序</span>
               </h3>
-              <YaoFactorTable factors={data?.top_factors} loading={loading} />
+              <MemeFactorTable factors={data?.top_factors} loading={loading} />
             </Card>
           </>
         )}
@@ -423,7 +423,7 @@ function YaoView() {
                 {refreshing ? <Spinner size={3} /> : '🔄'} 刷新信号
               </button>
             </div>
-            <YaoSignalsList signals={data?.signals} loading={loading} />
+            <MemeSignalsList signals={data?.signals} loading={loading} />
             <div className="mt-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/15 text-[10px] text-amber-600">
               ⚠️ 信号仅供参考，基于量化因子截面排序。Meme行情风险极高，请结合基本面和风控执行。
             </div>
@@ -436,7 +436,7 @@ function YaoView() {
             <h3 className="text-[12px] font-semibold text-zinc-300 mb-3 flex items-center gap-2">
               <span>📈</span> 迭代优化历程
             </h3>
-            <YaoIterationTimeline log={data?.iteration_log} loading={loading} />
+            <MemeIterationTimeline log={data?.iteration_log} loading={loading} />
           </Card>
         )}
 

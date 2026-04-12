@@ -2210,7 +2210,7 @@ async def api_task_detail(task_id: str):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# n8n / yao Pipeline Endpoints (migrated from webchat_api.py)
+# n8n / Meme Stock Pipeline Endpoints (migrated from webchat_api.py)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _ensure_brain_path():
@@ -2223,7 +2223,7 @@ def _ensure_brain_path():
 _MINE_SESSION_LOCK_KEY = "openclaw:mine_session:running"
 _MINE_SESSION_LOCK_TTL = 3600  # 1小时超时自动释放，防止崩溃后卡住
 
-_YAO_SESSION_LOCK_KEY = "openclaw:yao_session:running"
+_MEME_SESSION_LOCK_KEY = "openclaw:meme_session:running"
 _YAO_SESSION_LOCK_TTL = 3600
 
 
@@ -2296,13 +2296,13 @@ async def n8n_trigger_mine(request: Request):
     return {"ok": True, "message": f"挖掘已启动{focus_tag}: {rounds} 轮 x {factors} 因子/轮, ultra_short_weight={ultra_short_weight}"}
 
 
-# ── 妖股 Dashboard API ──────────────────────────────────
+# ── Meme Stock Dashboard API ──────────────────────────────────
 
 @app.get("/api/meme/dashboard")
 async def meme_dashboard():
     """短线Meme Stock 因子库全貌: 主题统计 / TOP 因子 / 最新信号 / 迭代日志。"""
     _ensure_brain_path()
-    from agents.yao_optimizer import analyze_library, REDIS_KEY_DASH_CACHE
+    from agents.yao_optimizer import analyze_library, REDIS_KEY_DASH_CACHE  # brain module
     r = await get_redis()
 
     # 优先返回缓存
@@ -2352,9 +2352,9 @@ async def meme_iterate(request: Request):
     _ensure_brain_path()
     from agents.yao_optimizer import get_focus_theme_for_next_session
     r = await get_redis()
-    locked = await r.set(_YAO_SESSION_LOCK_KEY, "1", nx=True, ex=_YAO_SESSION_LOCK_TTL)
+    locked = await r.set(_MEME_SESSION_LOCK_KEY, "1", nx=True, ex=_YAO_SESSION_LOCK_TTL)
     if not locked:
-        return {"ok": False, "skipped": True, "message": "妖股挖掘仍在进行中"}
+        return {"ok": False, "skipped": True, "message": "Meme Stock挖掘仍在进行中"}
 
     focus = await get_focus_theme_for_next_session(r)
     from agents.yao_digger import run_yao_session, THEME_NAMES
@@ -2381,7 +2381,7 @@ async def meme_iterate(request: Request):
             logger.error(f"meme_iterate failed: {e}")
         finally:
             r3 = await get_redis()
-            await r3.delete(_YAO_SESSION_LOCK_KEY)
+            await r3.delete(_MEME_SESSION_LOCK_KEY)
 
     asyncio.create_task(_run())
     from agents.yao_optimizer import THEME_NAMES
@@ -2395,12 +2395,12 @@ async def n8n_trigger_meme_mine(request: Request):
     """n8n 触发: 启动一轮Meme 因子挖掘。
 
     Meme 因子专注于挖掘A股高弹性个股「启动前 1-3 天」的量价预测信号。
-    与普通 /mine 的区别: 主题池全部针对妖股特征，LLM 上下文注入妖股先验知识。
+    与普通 /mine 的区别: 主题池全部针对Meme Stock特征，LLM 上下文注入Meme Stock先验知识。
 
     Body 参数:
         rounds: 挖掘轮数 (默认 3)
         factors_per_round: 每轮因子数 (默认 5)
-        focus_theme: 指定妖股主题 ID (可选，空=随机轮换)
+        focus_theme: 指定Meme Stock主题 ID (可选，空=随机轮换)
     """
     body = (
         await request.json()
@@ -2411,12 +2411,12 @@ async def n8n_trigger_meme_mine(request: Request):
     factors = int(body.get("factors_per_round", 5))
     focus_theme = body.get("focus_theme", "") or None
 
-    # 并发锁: 妖股 session 独立锁, 与普通 mine 互不干扰
+    # 并发锁: Meme Stock session 独立锁, 与普通 mine 互不干扰
     r = await get_redis()
-    locked = await r.set(_YAO_SESSION_LOCK_KEY, "1", nx=True, ex=_YAO_SESSION_LOCK_TTL)
+    locked = await r.set(_MEME_SESSION_LOCK_KEY, "1", nx=True, ex=_YAO_SESSION_LOCK_TTL)
     if not locked:
         return {"ok": False, "skipped": True,
-                "message": "妖股挖掘上一轮仍在运行，跳过（防止 139 内存溢出）"}
+                "message": "Meme Stock挖掘上一轮仍在运行，跳过（防止 139 内存溢出）"}
 
     _ensure_brain_path()
     from agents.yao_digger import run_yao_session
@@ -2430,7 +2430,7 @@ async def n8n_trigger_meme_mine(request: Request):
             )
             r2 = await get_redis()
             event = {
-                "type": "yao_session_done",
+                "type": "meme_session_done",
                 "result": result,
                 "focus_theme": focus_theme,
                 "timestamp": time.time(),
@@ -2441,13 +2441,13 @@ async def n8n_trigger_meme_mine(request: Request):
             logger.error(f"meme_mine trigger failed: {e}")
         finally:
             r3 = await get_redis()
-            await r3.delete(_YAO_SESSION_LOCK_KEY)
+            await r3.delete(_MEME_SESSION_LOCK_KEY)
 
     asyncio.create_task(_run())
     theme_tag = f" [主题={focus_theme}]" if focus_theme else ""
     return {
         "ok": True,
-        "message": f"妖股挖掘已启动{theme_tag}: {rounds} 轮 × {factors} 因子/轮",
+        "message": f"Meme Stock挖掘已启动{theme_tag}: {rounds} 轮 × {factors} 因子/轮",
     }
 
 
@@ -4824,23 +4824,23 @@ ID: {strategy_id}
 
 # ── Legacy URL Aliases (backward compat for n8n workflows) ──
 @app.get("/api/yao/dashboard")
-async def _yao_compat_dashboard():
+async def _meme_legacy_dashboard():
     return await meme_dashboard()
 
 @app.post("/api/yao/analyze")
-async def _yao_compat_analyze():
+async def _meme_legacy_analyze():
     return await meme_analyze()
 
 @app.post("/api/yao/signals/refresh")
-async def _yao_compat_signals():
+async def _meme_legacy_signals():
     return await meme_signals()
 
 @app.post("/api/yao/iterate")
-async def _yao_compat_iterate(request: Request):
+async def _meme_legacy_iterate(request: Request):
     return await meme_iterate(request)
 
 @app.post("/api/n8n/trigger/yao_mine")
-async def _yao_compat_mine(request: Request):
+async def _meme_legacy_mine(request: Request):
     return await n8n_trigger_meme_mine(request)
 
 # ── Serve Frontend ───────────────────────────────────────
