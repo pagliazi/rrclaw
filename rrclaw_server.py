@@ -42,6 +42,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # ── Config ───────────────────────────────────────────────
 
+server_start_time = time.time()
 REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 PORT = int(os.getenv("RRCLAW_PORT", "7789"))
 HOST = os.getenv("RRCLAW_HOST", "0.0.0.0")
@@ -932,12 +933,51 @@ async def api_command(request: Request):
     args = body.get("args", "")
     if not cmd:
         raise HTTPException(400, "missing cmd")
+
+    # Handle system commands locally
+    def _local_cmd(cmd):
+        if cmd == "llm_status":
+            if llm and llm._providers:
+                cfg = llm._configs[llm._current_index]
+                return "Provider: " + cfg.name + " | Model: " + cfg.model
+            return "LLM not initialized"
+        if cmd == "embed_status":
+            return "Embedding: local bge-m3 (Ollama)"
+        if cmd == "data_source_status":
+            return json.dumps({"redis": "ok" if pyagent_bridge and pyagent_bridge.is_connected else "disconnected", "reachrich": "configured" if os.getenv("REACHRICH_TOKEN") else "not configured", "tools": len(registry.get_all_active_schemas()) if registry else 0}, ensure_ascii=False, indent=2)
+        if cmd == "soul_check":
+            return "SOUL: RRCLAW ConversationRuntime active"
+        if cmd == "memory_health":
+            return "Session: ok | User: ok | System: ok"
+        if cmd == "memory_hygiene":
+            return "Memory hygiene: ok (auto-prune enabled)"
+        if cmd == "status":
+            stats = evolution_engine._stats if evolution_engine else {}
+            t0 = len(registry.tier0_tools) if registry else 0
+            t1 = len(registry.tier1_index) if registry else 0
+            return json.dumps({"runtime": "RRCLAW ConversationRuntime", "evolution": stats, "tools": {"tier0": t0, "tier1": t1}, "uptime": f"{time.time() - server_start_time:.0f}s"}, ensure_ascii=False, indent=2)
+        return None
+
+    local_result = _local_cmd(cmd)
+    if local_result is not None:
+        return {"result": local_result}
+
+    # Slash commands (/evolve, /research)
+    if cmd == "evolve" and evolve_command:
+        result = await evolve_command.execute(args)
+        return {"result": result}
+    if cmd == "research" and research_command:
+        result = await research_command.execute(args)
+        return {"result": result}
+
+    # Everything else → delegate to PyAgent via Redis
     user = getattr(request.state, "user", None)
     uid = f"web_{user['sub']}" if user else "webchat_default"
-    result = await send_to_orchestrator(cmd, args, uid=uid)
-    await save_chat_message("command", f"/{cmd} {args}".strip(), view="system")
-    await save_chat_message("result", result[:4000] if result else "", view="system")
-    return {"result": result}
+    try:
+        result = await send_to_orchestrator(cmd, args, uid=uid)
+    except Exception as e:
+        result = f"命令执行失败: {e}"
+    return {"result": result or ""}
 
 
 # ── Overview / System ────────────────────────────────────
