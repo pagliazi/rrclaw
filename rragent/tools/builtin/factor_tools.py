@@ -51,9 +51,9 @@ class FactorMineTool(Tool):
                 results.append({"type": "progress", "text": text})
 
             final = await run_alpha_digger(
-                rounds=rounds,
+                max_rounds=rounds,
                 factors_per_round=factors_per_round,
-                on_progress=_on_progress,
+                notify_fn=_on_progress,
             )
             return ToolResult.success(json.dumps(final, ensure_ascii=False, default=str))
         except ImportError:
