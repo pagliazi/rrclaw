@@ -2075,6 +2075,1983 @@ async def api_task_detail(task_id: str):
         return {"task": None, "error": str(e)}
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# n8n / yao Pipeline Endpoints (migrated from webchat_api.py)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _ensure_brain_path():
+    """Ensure BRAIN_PATH is on sys.path for importing agents.*"""
+    import sys
+    if BRAIN_PATH not in sys.path:
+        sys.path.insert(0, BRAIN_PATH)
+
+
+_MINE_SESSION_LOCK_KEY = "openclaw:mine_session:running"
+_MINE_SESSION_LOCK_TTL = 3600  # 1小时超时自动释放，防止崩溃后卡住
+
+_YAO_SESSION_LOCK_KEY = "openclaw:yao_session:running"
+_YAO_SESSION_LOCK_TTL = 3600
+
+
+@app.post("/api/n8n/webhook/factor-mined")
+async def n8n_webhook_factor_mined(request: Request):
+    """n8n webhook: 因子挖掘完成后回调。
+    n8n 可监听此事件触发后续 workflow (融合/策略化/通知)。"""
+    body = await request.json()
+    r = await get_redis()
+    event = {
+        "type": "factor_mined",
+        "factor_id": body.get("factor_id", ""),
+        "theme": body.get("theme", ""),
+        "sharpe": body.get("sharpe", 0),
+        "timestamp": time.time(),
+    }
+    await r.lpush("openclaw:n8n:events", json.dumps(event))
+    await r.ltrim("openclaw:n8n:events", 0, 99)  # keep last 100
+    return {"ok": True}
+
+
+@app.get("/api/n8n/events")
+async def n8n_get_events(limit: int = 20):
+    """n8n 轮询: 获取最近因子管线事件，用于 n8n polling trigger。"""
+    r = await get_redis()
+    raw = await r.lrange("openclaw:n8n:events", 0, limit - 1)
+    events = [json.loads(e) for e in raw] if raw else []
+    return {"events": events}
+
+
+@app.post("/api/n8n/trigger/mine")
+async def n8n_trigger_mine(request: Request):
+    """n8n 触发: 启动一轮因子挖掘。n8n workflow 可定时调用此端点。"""
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    rounds = body.get("rounds", 3)
+    factors = body.get("factors_per_round", 5)
+    ultra_short_weight = float(body.get("ultra_short_weight", 1.0))
+    focus = body.get("focus", "")
+
+    # 并发锁：防止多个 session 同时运行导致 139 内存/swap 耗尽
+    r = await get_redis()
+    locked = await r.set(_MINE_SESSION_LOCK_KEY, "1", nx=True, ex=_MINE_SESSION_LOCK_TTL)
+    if not locked:
+        return {"ok": False, "skipped": True,
+                "message": "上一轮挖掘仍在运行，跳过此次触发（防止 139 内存溢出）"}
+
+    _ensure_brain_path()
+    from agents.alpha_digger import run_digger_session
+
+    async def _run():
+        try:
+            result = await run_digger_session(
+                max_rounds=rounds,
+                factors_per_round=factors,
+                ultra_short_weight=ultra_short_weight,
+            )
+            r2 = await get_redis()
+            event = {"type": "mine_session_done", "result": result, "focus": focus,
+                     "timestamp": time.time()}
+            await r2.lpush("openclaw:n8n:events", json.dumps(event, default=str))
+            await r2.ltrim("openclaw:n8n:events", 0, 99)
+        except Exception as e:
+            logger.error(f"n8n mine trigger failed: {e}")
+        finally:
+            r3 = await get_redis()
+            await r3.delete(_MINE_SESSION_LOCK_KEY)
+
+    asyncio.create_task(_run())
+    focus_tag = f" [{focus}]" if focus else ""
+    return {"ok": True, "message": f"挖掘已启动{focus_tag}: {rounds} 轮 x {factors} 因子/轮, ultra_short_weight={ultra_short_weight}"}
+
+
+# ── 妖股 Dashboard API ──────────────────────────────────
+
+@app.get("/api/yao/dashboard")
+async def yao_dashboard():
+    """妖股因子库全貌: 主题统计 / TOP 因子 / 最新信号 / 迭代日志。"""
+    _ensure_brain_path()
+    from agents.yao_optimizer import analyze_library, REDIS_KEY_DASH_CACHE
+    r = await get_redis()
+
+    # 优先返回缓存
+    try:
+        cached = await r.get(REDIS_KEY_DASH_CACHE)
+        if cached:
+            return json.loads(cached)
+    except Exception:
+        pass
+
+    from agents.factor_library import get_factor_library
+    fl = get_factor_library()
+    return await analyze_library(fl, r)
+
+
+@app.post("/api/yao/analyze")
+async def yao_analyze():
+    """运行一次完整的妖股库分析 + 主题权重更新 (n8n 调用)。"""
+    _ensure_brain_path()
+    from agents.yao_optimizer import run_analysis_and_update
+    from agents.factor_library import get_factor_library
+    r = await get_redis()
+    fl = get_factor_library()
+    result = await run_analysis_and_update(fl, r)
+    return {"ok": True, "result": result}
+
+
+@app.post("/api/yao/signals/refresh")
+async def yao_signals_refresh(request: Request):
+    """用 TOP 妖股因子跑实盘截面筛选，刷新信号缓存 (n8n 调用)。"""
+    _ensure_brain_path()
+    from agents.yao_optimizer import refresh_signals
+    from agents.factor_library import get_factor_library
+    from agents.bridge_client import get_bridge_client
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    top_n = int(body.get("top_n", 3))
+    r = await get_redis()
+    fl = get_factor_library()
+    bridge = get_bridge_client()
+    signals = await refresh_signals(fl, bridge, r, top_n=top_n)
+    return {"ok": True, "count": len(signals)}
+
+
+@app.post("/api/yao/iterate")
+async def yao_iterate(request: Request):
+    """根据当前主题权重触发一次针对性迭代挖掘 (前端手动触发 / n8n 调用)。"""
+    _ensure_brain_path()
+    from agents.yao_optimizer import get_focus_theme_for_next_session
+    r = await get_redis()
+    locked = await r.set(_YAO_SESSION_LOCK_KEY, "1", nx=True, ex=_YAO_SESSION_LOCK_TTL)
+    if not locked:
+        return {"ok": False, "skipped": True, "message": "妖股挖掘仍在进行中"}
+
+    focus = await get_focus_theme_for_next_session(r)
+    from agents.yao_digger import run_yao_session, THEME_NAMES
+
+    async def _run():
+        try:
+            result = await run_yao_session(max_rounds=2, factors_per_round=5, focus_theme_id=focus)
+            r2 = await get_redis()
+            from agents.yao_optimizer import run_analysis_and_update, log_iteration_event
+            from agents.factor_library import get_factor_library
+            fl = get_factor_library()
+            await run_analysis_and_update(fl, r2)
+            event = {
+                "ts": time.time(),
+                "ts_str": __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "type": "iterate",
+                "focus_theme": focus,
+                "focus_theme_name": THEME_NAMES.get(focus, focus) if focus else "全主题",
+                "admitted": result.get("total_admitted", 0),
+                "rounds": result.get("rounds_completed", 0),
+            }
+            await log_iteration_event(r2, event)
+        except Exception as e:
+            logger.error(f"yao_iterate failed: {e}")
+        finally:
+            r3 = await get_redis()
+            await r3.delete(_YAO_SESSION_LOCK_KEY)
+
+    asyncio.create_task(_run())
+    from agents.yao_optimizer import THEME_NAMES
+    theme_label = THEME_NAMES.get(focus, focus) if focus else "全主题随机"
+    return {"ok": True, "focus_theme": focus, "focus_theme_name": theme_label,
+            "message": f"迭代挖掘已启动 → 重点主题: {theme_label}"}
+
+
+@app.post("/api/n8n/trigger/yao_mine")
+async def n8n_trigger_yao_mine(request: Request):
+    """n8n 触发: 启动一轮妖股因子挖掘。
+
+    妖股因子专注于挖掘A股高弹性个股「启动前 1-3 天」的量价预测信号。
+    与普通 /mine 的区别: 主题池全部针对妖股特征，LLM 上下文注入妖股先验知识。
+
+    Body 参数:
+        rounds: 挖掘轮数 (默认 3)
+        factors_per_round: 每轮因子数 (默认 5)
+        focus_theme: 指定妖股主题 ID (可选，空=随机轮换)
+    """
+    body = (
+        await request.json()
+        if request.headers.get("content-type", "").startswith("application/json")
+        else {}
+    )
+    rounds = int(body.get("rounds", 3))
+    factors = int(body.get("factors_per_round", 5))
+    focus_theme = body.get("focus_theme", "") or None
+
+    # 并发锁: 妖股 session 独立锁, 与普通 mine 互不干扰
+    r = await get_redis()
+    locked = await r.set(_YAO_SESSION_LOCK_KEY, "1", nx=True, ex=_YAO_SESSION_LOCK_TTL)
+    if not locked:
+        return {"ok": False, "skipped": True,
+                "message": "妖股挖掘上一轮仍在运行，跳过（防止 139 内存溢出）"}
+
+    _ensure_brain_path()
+    from agents.yao_digger import run_yao_session
+
+    async def _run():
+        try:
+            result = await run_yao_session(
+                max_rounds=rounds,
+                factors_per_round=factors,
+                focus_theme_id=focus_theme,
+            )
+            r2 = await get_redis()
+            event = {
+                "type": "yao_session_done",
+                "result": result,
+                "focus_theme": focus_theme,
+                "timestamp": time.time(),
+            }
+            await r2.lpush("openclaw:n8n:events", json.dumps(event, default=str))
+            await r2.ltrim("openclaw:n8n:events", 0, 99)
+        except Exception as e:
+            logger.error(f"yao_mine trigger failed: {e}")
+        finally:
+            r3 = await get_redis()
+            await r3.delete(_YAO_SESSION_LOCK_KEY)
+
+    asyncio.create_task(_run())
+    theme_tag = f" [主题={focus_theme}]" if focus_theme else ""
+    return {
+        "ok": True,
+        "message": f"妖股挖掘已启动{theme_tag}: {rounds} 轮 × {factors} 因子/轮",
+    }
+
+
+async def _run_combine(bridge, lib, factors, start_date, end_date, source="manual"):
+    """执行一次因子融合: 组装代码 → 回测 → 评估 → 记录。
+
+    Returns: (metrics, verdict, record_id, new_factor_id)
+    """
+    codes = []
+    for i, f in enumerate(factors):
+        renamed = f.code.replace("def generate_factor(", f"def _factor_{i+1}(")
+        codes.append(renamed)
+
+    combiner = (
+        "\n\nimport numpy as np\nimport pandas as pd\n\n"
+        "def generate_factor(matrices):\n"
+        "    factors = []\n"
+    )
+    for i in range(len(factors)):
+        combiner += f"    try:\n        factors.append(_factor_{i+1}(matrices))\n    except Exception:\n        pass\n"
+    combiner += (
+        "    if not factors:\n"
+        "        return pd.DataFrame(0, index=matrices['close'].index, columns=matrices['close'].columns)\n"
+        "    stacked = np.stack([f.values for f in factors], axis=0)\n"
+        "    combined = np.nanmean(stacked, axis=0)\n"
+        "    return pd.DataFrame(combined, index=matrices['close'].index, columns=matrices['close'].columns)\n"
+    )
+    combined_code = "\n\n".join(codes) + combiner
+
+    metrics = {}
+    try:
+        resp = await bridge.run_factor_mining(
+            factor_code=combined_code,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if resp.get("status") != "error":
+            metrics = resp.get("metrics") or {}
+    except Exception as e:
+        logger.warning("combine backtest failed: %s", e)
+
+    input_info = [{"id": f.id, "theme": f.sub_theme or f.theme,
+                    "sharpe": f.sharpe, "ir": f.ir, "ic_mean": f.ic_mean,
+                    "win_rate": f.win_rate, "max_drawdown": f.max_drawdown} for f in factors]
+
+    evaluation = lib.evaluate_combine_quality(input_info, metrics)
+    verdict = evaluation["verdict"]
+
+    record = {
+        "input_factors": input_info,
+        "input_factor_ids": [f.id for f in factors],
+        "combined_metrics": metrics,
+        "evaluation": evaluation,
+        "verdict": verdict,
+        "source": source,
+        "status": "accepted" if verdict == "accept" else "rejected" if verdict == "reject" else "marginal",
+    }
+    record_id = await lib.save_combine_record(record)
+
+    # 融合成功的因子自动加入因子库
+    new_factor_id = None
+    if verdict == "accept" and metrics:
+        themes = list(set(f.theme for f in factors if f.theme))
+        combined_theme = "combo_" + "+".join(themes[:3]) if themes else "combo"
+        sub_theme = f"融合{len(factors)}因子({source})"
+        ok, reason, new_factor_id = await lib.add_factor(
+            code=combined_code,
+            metrics=metrics,
+            theme=combined_theme,
+            sub_theme=sub_theme,
+        )
+        if ok:
+            logger.info("融合因子入库: %s (来源: %s, sharpe=%.3f)",
+                        new_factor_id, source, metrics.get("sharpe_ratio", metrics.get("sharpe", 0)))
+
+    return metrics, verdict, record_id, new_factor_id
+
+
+@app.post("/api/n8n/trigger/combine-smart")
+async def n8n_trigger_combine_smart(request: Request):
+    """n8n 触发: 智能择优融合 — 跨主题互补 + 贪心序列。
+
+    优先级: smart > greedy > exhaustive
+    - smart:  跨主题互补组合 (不同主题代表因子两两/三三组合)
+    - greedy: 从最强因子开始，逐步加入最互补因子，测试 2/3/4 因子组合
+    两种策略自动生成组合，回测评估后记录结果。
+    """
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    max_combos = body.get("max_combos", 20)
+
+    _ensure_brain_path()
+    from agents.factor_library import FactorLibrary
+    from agents.bridge_client import get_bridge_client
+    from datetime import date, timedelta
+
+    async def _run():
+        lib = FactorLibrary(redis_client=await get_redis())
+        bridge = get_bridge_client()
+        rd = await get_redis()
+
+        # 获取已测试过的组合
+        history = await lib.get_combine_records(limit=500)
+        tested = set(tuple(sorted(rec.get("input_factor_ids", []))) for rec in history)
+
+        start_date = (date.today() - timedelta(days=180)).isoformat()
+        end_date = date.today().isoformat()
+        results = {"smart": [], "greedy": [], "total_tested": 0, "total_accepted": 0}
+
+        # ── Phase 1: Smart 跨主题互补组合 ──
+        smart_groups = await lib.get_smart_combine_groups(max_group_size=4)
+        tested_count = 0
+        for group in smart_groups:
+            if tested_count >= max_combos:
+                break
+            combo_key = tuple(sorted(f.id for f in group))
+            if combo_key in tested:
+                continue
+
+            metrics, verdict, record_id, new_fid = await _run_combine(
+                bridge, lib, group, start_date, end_date, source="smart"
+            )
+            tested.add(combo_key)
+            tested_count += 1
+            results["total_tested"] += 1
+
+            result_entry = {
+                "record_id": record_id,
+                "factors": [{"id": f.id, "theme": f.theme, "sharpe": f.sharpe} for f in group],
+                "verdict": verdict,
+                "combined_sharpe": (metrics or {}).get("sharpe_ratio") or (metrics or {}).get("sharpe", 0),
+            }
+            results["smart"].append(result_entry)
+            if verdict == "accept":
+                results["total_accepted"] += 1
+
+            await asyncio.sleep(1)
+
+        # ── Phase 2: Greedy 贪心递增组合 ──
+        greedy_seq = await lib.get_greedy_combine_sequence(max_factors=5)
+        if len(greedy_seq) >= 2:
+            for size in range(2, min(len(greedy_seq) + 1, 5)):
+                if tested_count >= max_combos:
+                    break
+                group = greedy_seq[:size]
+                combo_key = tuple(sorted(f.id for f in group))
+                if combo_key in tested:
+                    continue
+
+                metrics, verdict, record_id, new_fid = await _run_combine(
+                    bridge, lib, group, start_date, end_date, source="greedy"
+                )
+                tested.add(combo_key)
+                tested_count += 1
+                results["total_tested"] += 1
+
+                result_entry = {
+                    "record_id": record_id,
+                    "factors": [{"id": f.id, "theme": f.theme, "sharpe": f.sharpe} for f in group],
+                    "verdict": verdict,
+                    "combined_sharpe": (metrics or {}).get("sharpe_ratio") or (metrics or {}).get("sharpe", 0),
+                    "group_size": size,
+                }
+                results["greedy"].append(result_entry)
+                if verdict == "accept":
+                    results["total_accepted"] += 1
+
+                await asyncio.sleep(1)
+
+        # Push event
+        event = {
+            "type": "combine_smart_done",
+            "tested": results["total_tested"],
+            "accepted": results["total_accepted"],
+            "smart_count": len(results["smart"]),
+            "greedy_count": len(results["greedy"]),
+            "timestamp": time.time(),
+        }
+        await rd.lpush("openclaw:n8n:events", json.dumps(event, default=str))
+        await rd.ltrim("openclaw:n8n:events", 0, 99)
+
+    asyncio.create_task(_run())
+    return {"ok": True, "message": f"智能融合已启动 (smart + greedy, max_combos={max_combos})"}
+
+
+@app.post("/api/n8n/trigger/combine-all")
+async def n8n_trigger_combine_all(request: Request):
+    """n8n 触发: 穷举融合 (在 smart combine 之后执行，覆盖剩余组合)。"""
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    group_size = body.get("group_size", 2)
+    max_combos = body.get("max_combos", 50)
+
+    _ensure_brain_path()
+    from agents.factor_library import FactorLibrary
+    from agents.bridge_client import get_bridge_client
+    from itertools import combinations
+    from datetime import date, timedelta
+
+    async def _run():
+        lib = FactorLibrary(redis_client=await get_redis())
+        bridge = get_bridge_client()
+        candidates = await lib.get_combine_candidates()
+        if len(candidates) < group_size:
+            return
+
+        history = await lib.get_combine_records(limit=500)
+        tested = set(tuple(sorted(rec.get("input_factor_ids", []))) for rec in history)
+
+        all_combos = list(combinations(range(len(candidates)), group_size))
+        combos = [c for c in all_combos if tuple(sorted(candidates[i].id for i in c)) not in tested][:max_combos]
+
+        start_date = (date.today() - timedelta(days=180)).isoformat()
+        end_date = date.today().isoformat()
+        accepted = 0
+
+        for combo in combos:
+            factors = [candidates[i] for i in combo]
+            codes = []
+            for i, f in enumerate(factors):
+                codes.append(f.code.replace("def generate_factor(", f"def _factor_{i+1}("))
+            combiner = (
+                "\n\nimport numpy as np\nimport pandas as pd\n\n"
+                "def generate_factor(matrices):\n    factors = []\n"
+            )
+            for i in range(len(factors)):
+                combiner += f"    try:\n        factors.append(_factor_{i+1}(matrices))\n    except Exception:\n        pass\n"
+            combiner += (
+                "    if not factors:\n        return pd.DataFrame(0, index=matrices['close'].index, columns=matrices['close'].columns)\n"
+                "    stacked = np.stack([f.values for f in factors], axis=0)\n"
+                "    combined = np.nanmean(stacked, axis=0)\n"
+                "    return pd.DataFrame(combined, index=matrices['close'].index, columns=matrices['close'].columns)\n"
+            )
+            combined_code = "\n\n".join(codes) + combiner
+            try:
+                resp = await bridge.run_factor_mining(factor_code=combined_code, start_date=start_date, end_date=end_date)
+                metrics = resp.get("metrics") or {} if resp.get("status") != "error" else {}
+            except Exception:
+                metrics = {}
+
+            input_info = [{"id": f.id, "theme": f.sub_theme or f.theme, "sharpe": f.sharpe, "ir": f.ir, "ic_mean": f.ic_mean} for f in factors]
+            evaluation = lib.evaluate_combine_quality(input_info, metrics)
+            record = {
+                "input_factors": input_info, "input_factor_ids": [f.id for f in factors],
+                "combined_metrics": metrics, "evaluation": evaluation, "verdict": evaluation["verdict"],
+                "status": "accepted" if evaluation["verdict"] == "accept" else "rejected",
+                "source": "n8n_exhaustive",
+            }
+            await lib.save_combine_record(record)
+            if evaluation["verdict"] == "accept":
+                accepted += 1
+            await asyncio.sleep(1)
+
+        r = await get_redis()
+        event = {"type": "combine_all_done", "tested": len(combos), "accepted": accepted, "timestamp": time.time()}
+        await r.lpush("openclaw:n8n:events", json.dumps(event))
+        await r.ltrim("openclaw:n8n:events", 0, 99)
+
+    asyncio.create_task(_run())
+    return {"ok": True, "message": f"穷举融合已启动: group_size={group_size}, max_combos={max_combos}"}
+
+
+@app.get("/api/n8n/pipeline/status")
+async def n8n_pipeline_status():
+    """n8n 查询: 获取因子管线整体状态 (因子数、最近融合、挖掘状态)。"""
+    _ensure_brain_path()
+    from agents.factor_library import FactorLibrary
+    lib = FactorLibrary(redis_client=await get_redis())
+    stats = await lib.get_stats()
+    r = await get_redis()
+    recent_events = await r.lrange("openclaw:n8n:events", 0, 4)
+    events = [json.loads(e) for e in recent_events] if recent_events else []
+    digger_running = bool(await r.get("openclaw:digger:running"))
+    return {
+        "factor_stats": stats,
+        "digger_running": digger_running,
+        "recent_events": events,
+    }
+
+
+@app.post("/api/n8n/trigger/promote")
+async def n8n_trigger_promote(request: Request):
+    """n8n 触发: 自动将 Top N 因子策略化 → 同步到 139 screener。
+
+    流程:
+      1. 从因子库选出 sharpe 最高且尚未策略化的因子
+      2. 逐个执行 to-strategy (因子 → 回测 → 存入策略库)
+      3. 对生成的策略执行 sync (部署到 139 + 注册 screener preset)
+      4. 推送事件供 n8n 通知
+    """
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    top_n = body.get("top_n", 3)
+    min_sharpe = body.get("min_sharpe", 1.0)
+
+    _ensure_brain_path()
+    from agents.factor_library import FactorLibrary
+    from agents.bridge_client import get_bridge_client
+    from datetime import date, timedelta
+
+    async def _run():
+        lib = FactorLibrary(redis_client=await get_redis())
+        bridge = get_bridge_client()
+        rd = await get_redis()
+
+        # 获取已策略化的因子 ID
+        raw_strats = await rd.hgetall(STRATEGY_REDIS_KEY)
+        strategized_fids = set()
+        for v in raw_strats.values():
+            try:
+                s = json.loads(v)
+                if s.get("factor_id"):
+                    strategized_fids.add(s["factor_id"])
+            except Exception:
+                pass
+
+        # 选出尚未策略化的 Top 因子
+        all_factors = await lib.get_all_factors(status="active")
+        candidates = [f for f in all_factors
+                      if f.id not in strategized_fids and f.sharpe >= min_sharpe]
+        candidates.sort(key=lambda f: f.sharpe, reverse=True)
+        targets = candidates[:top_n]
+
+        if not targets:
+            event = {"type": "promote_done", "promoted": 0,
+                     "message": "没有符合条件的未策略化因子",
+                     "timestamp": time.time()}
+            await rd.lpush("openclaw:n8n:events", json.dumps(event))
+            await rd.ltrim("openclaw:n8n:events", 0, 99)
+            return
+
+        promoted = []
+        for factor in targets:
+            try:
+                # Step 1: to-strategy
+                entry_pct = 0.95
+                exit_pct = 0.70
+                strategy_code = factor.code + f"""
+
+def generate_signals(matrices):
+    factor = generate_factor(matrices)
+    close = matrices['close']
+    rank_pct = factor.rank(axis=1, pct=True)
+    factor_rising = factor > factor.shift(1)
+    entries = (rank_pct > {entry_pct}) & factor_rising
+    ma5 = close.rolling(5).mean()
+    exits = (rank_pct < {exit_pct}) | (close < ma5)
+    entries = entries.fillna(False)
+    exits = exits.fillna(False)
+    return entries, exits
+"""
+                start_date = (date.today() - timedelta(days=180)).isoformat()
+                end_date = date.today().isoformat()
+
+                resp = await bridge.run_alpha(
+                    alpha_code=strategy_code,
+                    start_date=start_date, end_date=end_date,
+                    mode="technical",
+                )
+                metrics = resp.get("metrics", {})
+                if resp.get("status") == "error":
+                    logger.warning("promote: factor %s backtest failed: %s", factor.id, resp.get("error"))
+                    continue
+
+                # 质量检查: 策略回测后也要过质量关
+                from agents.factor_quality import metrics_audit
+                qr = metrics_audit(metrics)
+                if not qr.passed:
+                    logger.info("promote: factor %s strategy failed quality: %s", factor.id, qr.summary)
+                    continue
+
+                strat_id = f"strat_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+                theme = factor.sub_theme or factor.theme
+                strat_record = {
+                    "id": strat_id,
+                    "title": f"[{theme}] Sharpe={factor.sharpe:.2f}",
+                    "description": f"基于因子 {factor.id} ({theme}) 自动策略化",
+                    "source": "factor", "factor_id": factor.id,
+                    "factor_theme": theme, "factor_sharpe": factor.sharpe,
+                    "code": strategy_code, "metrics": metrics,
+                    "params": {"entry_pct": entry_pct, "exit_pct": exit_pct},
+                    "status": "draft", "synced_to_139": False,
+                    "quality_grade": qr.grade, "quality_score": qr.score,
+                    "created_at": time.time(),
+                }
+                await rd.hset(STRATEGY_REDIS_KEY, strat_id, json.dumps(strat_record, ensure_ascii=False, default=str))
+
+                # Step 2: sync to 139 (deploy + ledger + register-preset)
+                try:
+                    await bridge._post("/strategy/deploy/", {
+                        "strategy_id": strat_id, "code": strategy_code,
+                        "filename": f"{strat_id}.py",
+                    })
+                    ledger_resp = await bridge.save_strategy(
+                        title=f"[因子] {theme} Sharpe={factor.sharpe:.2f}",
+                        strategy_code=strategy_code,
+                        backtest_metrics=metrics,
+                        status="APPROVE", topic=theme,
+                        model_used="rrclaw-factor-pipeline",
+                    )
+                    ledger_id = ledger_resp.get("id")
+                    # Register as preset so it appears in /presets/ list
+                    slug = f"factor_{factor.id}_{int(time.time())}"
+                    await bridge._post("/strategy/register-preset/", {
+                        "slug": slug,
+                        "name": f"[因子] {theme} Sharpe={factor.sharpe:.2f}",
+                        "description": f"因子策略选股: {theme} (Sharpe={factor.sharpe:.2f})",
+                        "category": "factor",
+                        "payload": {
+                            "code": strategy_code,
+                            "metrics": metrics,
+                            "params": {"entry_pct": entry_pct, "exit_pct": exit_pct},
+                        },
+                        "ledger_id": ledger_id,
+                    })
+                    strat_record["synced_to_139"] = True
+                    strat_record["status"] = "synced"
+                    strat_record["ledger_id"] = ledger_id
+                    strat_record["preset_slug"] = slug
+                    await rd.hset(STRATEGY_REDIS_KEY, strat_id, json.dumps(strat_record, ensure_ascii=False, default=str))
+                except Exception as e:
+                    logger.warning("promote: sync to 139 failed for %s: %s", strat_id, e)
+
+                promoted.append({
+                    "strategy_id": strat_id, "factor_id": factor.id,
+                    "theme": theme, "sharpe": factor.sharpe,
+                    "quality_grade": qr.grade,
+                })
+                await asyncio.sleep(2)
+
+            except Exception as e:
+                logger.error("promote: factor %s failed: %s", factor.id, e)
+
+        event = {
+            "type": "promote_done",
+            "promoted": len(promoted),
+            "strategies": promoted,
+            "timestamp": time.time(),
+        }
+        await rd.lpush("openclaw:n8n:events", json.dumps(event, default=str))
+        await rd.ltrim("openclaw:n8n:events", 0, 99)
+
+    asyncio.create_task(_run())
+    return {"ok": True, "message": f"策略推送已启动: top_n={top_n}, min_sharpe={min_sharpe}"}
+
+
+# ── n8n: System Health & Auto-Promote ────────────────
+
+# launchctl label 映射
+_LAUNCHD_LABELS = {
+    "orchestrator": "com.openclaw.orchestrator",
+    "market": "com.openclaw.market-agent",
+    "analysis": "com.openclaw.analysis-agent",
+    "news": "com.openclaw.news-agent",
+    "strategist": "com.openclaw.strategist-agent",
+    "browser": "com.openclaw.browser-agent",
+    "general": "com.openclaw.general-agent",
+    "backtest": "com.openclaw.backtest-agent",
+    "monitor": "com.openclaw.monitor-agent",
+    "telegram_bot": "com.openclaw.telegram-bot",
+    "feishu_bot": "com.openclaw.feishu-bot",
+    "webchat": "com.openclaw.webchat",
+    "n8n": "com.openclaw.n8n",
+    "desktop": "com.openclaw.desktop-agent",
+    "dev": "com.openclaw.dev-agent",
+    "apple": "com.openclaw.apple-agent",
+}
+
+
+async def _call_orchestrator_skill(r, action: str, params: dict = None, timeout: float = 30) -> dict:
+    """通过 Redis Pub/Sub 调用 orchestrator skill 并等待回复。"""
+    msg_id = f"selfimprove_{action}_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    reply_ch = "openclaw:selfimprove"
+
+    pubsub = r.pubsub()
+    await pubsub.subscribe(reply_ch)
+
+    msg = json.dumps({
+        "id": msg_id, "sender": "selfimprove", "target": "orchestrator",
+        "action": action, "params": params or {},
+        "timestamp": time.time(),
+    })
+    await r.publish("openclaw:orchestrator", msg)
+
+    try:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            raw = await asyncio.wait_for(
+                pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0),
+                timeout=min(2.0, deadline - time.time() + 0.1),
+            )
+            if raw is None:
+                continue
+            if raw["type"] != "message":
+                continue
+            data = json.loads(raw["data"])
+            if data.get("id") == msg_id or data.get("reply_to") == msg_id:
+                return data.get("result", data)
+    except (asyncio.TimeoutError, asyncio.CancelledError):
+        pass
+    finally:
+        await pubsub.unsubscribe(reply_ch)
+        await pubsub.close()
+
+    return {"error": f"orchestrator {action} 超时 ({timeout}s)"}
+
+
+_EVOLVER_DIR = "/Users/clawagent/.openclaw/workspace/skills/capability-evolver"
+
+
+async def _run_evolver_op(op_script: str, timeout: int = 30) -> dict:
+    """在 clawagent 用户下运行 capability-evolver 操作模块，返回 JSON 结果。"""
+    import subprocess as _sp
+    script = op_script.replace('require("./src/', f'require("{_EVOLVER_DIR}/src/')
+    node_bin = "/opt/homebrew/bin/node"
+    import getpass
+    if getpass.getuser() == "clawagent":
+        cmd = [node_bin, "-e", script]
+    else:
+        cmd = ["sudo", "-u", "clawagent", "-H", node_bin, "-e", script]
+    try:
+        result = _sp.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=_EVOLVER_DIR)
+        combined = (result.stdout + "\n" + result.stderr).strip()
+        for line in reversed(combined.split("\n")):
+            line = line.strip()
+            if line.startswith("{") or line.startswith("["):
+                return json.loads(line)
+        return {"raw": combined[:500], "returncode": result.returncode}
+    except _sp.TimeoutExpired:
+        return {"error": f"evolver op timeout ({timeout}s)"}
+    except Exception as e:
+        return {"error": str(e)[:200]}
+
+
+async def _launchctl_restart(svc_name: str, label: str) -> str:
+    """通过 launchctl 重启服务，返回结果描述。"""
+    import subprocess as _sp
+    try:
+        uid_result = _sp.run(["id", "-u", "clawagent"], capture_output=True, text=True, timeout=5)
+        claw_uid = uid_result.stdout.strip() or "503"
+        result = _sp.run(
+            ["sudo", "launchctl", "kickstart", "-k", f"gui/{claw_uid}/{label}"],
+            capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode == 0:
+            return f"{svc_name}: kickstart 成功"
+        plist_path = f"/Users/clawagent/Library/LaunchAgents/{label}.plist"
+        _sp.run(["sudo", "launchctl", "bootout", f"gui/{claw_uid}/{label}"],
+                capture_output=True, timeout=10)
+        res2 = _sp.run(["sudo", "launchctl", "bootstrap", f"gui/{claw_uid}", plist_path],
+                       capture_output=True, text=True, timeout=10)
+        if res2.returncode == 0:
+            return f"{svc_name}: bootstrap 成功 (fallback)"
+        return f"FAIL:{svc_name}: {result.stderr.strip()[:100]}"
+    except Exception as e:
+        return f"FAIL:{svc_name}: {str(e)[:100]}"
+
+
+@app.get("/api/n8n/system/health")
+async def n8n_system_health():
+    """n8n 查询: 全面检查 rrclaw 系统状态 — 服务健康、因子库质量、是否需要 selfimprove。"""
+    import subprocess
+    r = await get_redis()
+
+    # 1. 检查各服务进程
+    services = {
+        "rragent": {"process": "rragent", "port": 7789},
+        "orchestrator": {"process": "orchestrator", "port": None},
+        "telegram_bot": {"process": "telegram_bot", "port": None},
+        "feishu_bot": {"process": "feishu_bot", "port": None},
+    }
+    service_status = {}
+    for name, info in services.items():
+        if name == "rragent":
+            # rragent 就是当前进程，肯定在运行
+            service_status[name] = {"running": True, "pids": [str(os.getpid())]}
+            continue
+        if info.get("port"):
+            try:
+                result = subprocess.run(
+                    ["lsof", "-ti", f":{info['port']}"],
+                    capture_output=True, text=True, timeout=5
+                )
+                pids = [p for p in result.stdout.strip().split("\n") if p]
+                service_status[name] = {"running": len(pids) > 0, "pids": pids}
+            except Exception:
+                service_status[name] = {"running": False, "pids": []}
+        else:
+            try:
+                result = subprocess.run(
+                    ["pgrep", "-f", info["process"]],
+                    capture_output=True, text=True, timeout=5
+                )
+                service_status[name] = {"running": result.returncode == 0, "pids": result.stdout.strip().split("\n") if result.returncode == 0 else []}
+            except Exception:
+                service_status[name] = {"running": False, "pids": []}
+
+    # 2. Redis 连通性
+    redis_ok = False
+    try:
+        await r.ping()
+        redis_ok = True
+    except Exception:
+        pass
+
+    # 3. 因子库状态
+    _ensure_brain_path()
+    from agents.factor_library import FactorLibrary
+    lib = FactorLibrary(redis_client=r)
+    factor_stats = await lib.get_stats()
+
+    # 4. 渠道心跳
+    heartbeats = {}
+    try:
+        raw = await r.hgetall("openclaw:channel_heartbeats")
+        for ch, hb in raw.items():
+            ch_name = ch if isinstance(ch, str) else ch.decode()
+            try:
+                hb_data = json.loads(hb)
+                age = time.time() - hb_data.get("ts", 0)
+                heartbeats[ch_name] = {"online": age < 30, "age_seconds": round(age, 1)}
+            except Exception:
+                heartbeats[ch_name] = {"online": False, "age_seconds": -1}
+    except Exception:
+        pass
+
+    # 5. 最近事件
+    recent_events = await r.lrange("openclaw:n8n:events", 0, 9)
+    events = [json.loads(e) for e in recent_events] if recent_events else []
+
+    # 6. SOUL 完整性
+    soul_ok = False
+    try:
+        soul_raw = await r.get("openclaw:soul")
+        soul_ok = bool(soul_raw and len(soul_raw) > 100)
+    except Exception:
+        pass
+
+    # 7. Memory 状态
+    memory_count = 0
+    try:
+        memory_count = await r.hlen("openclaw:memory:entities") or 0
+    except Exception:
+        pass
+
+    # 8. selfimprove 判断
+    needs_selfimprove = False
+    selfimprove_reasons = []
+
+    # 因子库太少
+    active_count = factor_stats.get("active_count", 0)
+    if active_count < 30:
+        needs_selfimprove = True
+        selfimprove_reasons.append(f"因子库偏少: {active_count} (目标>50)")
+
+    # 平均质量差
+    avg_sharpe = factor_stats.get("avg_sharpe", 0)
+    if avg_sharpe and avg_sharpe < 1.0:
+        needs_selfimprove = True
+        selfimprove_reasons.append(f"因子平均 Sharpe 偏低: {avg_sharpe:.3f} (目标>1.0)")
+
+    # 服务宕机
+    down_services = [name for name, s in service_status.items() if not s["running"]]
+    if down_services:
+        selfimprove_reasons.append(f"服务未运行: {', '.join(down_services)}")
+
+    # 渠道离线
+    offline_channels = [ch for ch, s in heartbeats.items() if not s["online"]]
+    if offline_channels:
+        selfimprove_reasons.append(f"渠道离线: {', '.join(offline_channels)}")
+
+    # SOUL 缺失
+    if not soul_ok:
+        needs_selfimprove = True
+        selfimprove_reasons.append("SOUL 缺失或损坏")
+
+    # 长时间未挖掘
+    last_mine = None
+    for ev in events:
+        if ev.get("type") == "mine_session_done":
+            last_mine = ev.get("timestamp")
+            break
+    if last_mine and (time.time() - last_mine) > 86400:
+        needs_selfimprove = True
+        selfimprove_reasons.append(f"超过 24h 未进行因子挖掘")
+
+    # 9. ReflectionEngine 洞察
+    reflection_insight = ""
+    failing_agents = []
+    try:
+        from agents.memory.reflection_engine import ReflectionEngine
+        re = ReflectionEngine()
+        reflection_insight = re.generate_daily_insight()
+        failing_agents = list(re.get_failure_prone_agents())
+        if failing_agents:
+            needs_selfimprove = True
+            selfimprove_reasons.append(f"Agent 失败率过高: {', '.join(failing_agents)}")
+    except Exception:
+        reflection_insight = ""
+        failing_agents = []
+
+    return {
+        "services": service_status,
+        "redis": redis_ok,
+        "channels": heartbeats,
+        "factor_stats": factor_stats,
+        "soul_ok": soul_ok,
+        "memory_entities": memory_count,
+        "recent_events": events[:5],
+        "needs_selfimprove": needs_selfimprove,
+        "selfimprove_reasons": selfimprove_reasons,
+        "reflection_insight": reflection_insight,
+        "failing_agents": failing_agents,
+    }
+
+
+@app.post("/api/n8n/trigger/selfimprove")
+async def n8n_trigger_selfimprove(request: Request):
+    """n8n 触发: 系统自修复 + 自学习 + 自我进化。
+
+    工作流:
+    1. 调用 health 检测问题
+    2. 服务宕机 → launchctl 重启
+    3. SOUL 缺失 → 调用 orchestrator.soul_check 检测 + 重建
+    4. 记忆退化 → 调用 memory_health + memory_compress + memory_remind
+    5. 路由不准 → 调用 reflect_insight 自学习优化路由
+    6. 长时间未挖掘 → 触发轻量挖掘
+    7. n8n 连通 → 自检修复
+    8. Agent 失败率高 → 调用 reflect_stats 分析 + 自我进化
+    """
+    import subprocess as _sp
+
+    r = await get_redis()
+    repairs = []
+    failures = []
+    skills_called = []
+
+    # ── 1. 获取 health 状态 ──
+    health = await n8n_system_health()
+    reasons = health.get("selfimprove_reasons", [])
+
+    if not reasons and not health.get("failing_agents"):
+        return {"ok": True, "message": "系统健康，无需修复", "repairs": [], "failures": []}
+
+    # ── 2. 修复未运行的服务 ──
+    for svc_name, svc_info in health.get("services", {}).items():
+        if svc_info.get("running"):
+            continue
+        label = _LAUNCHD_LABELS.get(svc_name)
+        if not label:
+            failures.append(f"{svc_name}: 无 launchd label 映射")
+            continue
+        msg = await _launchctl_restart(svc_name, label)
+        if msg.startswith("FAIL:"):
+            failures.append(msg[5:])
+        else:
+            repairs.append(msg)
+
+    # ── 3. SOUL 修复 — 调用 orchestrator skill ──
+    if not health.get("soul_ok"):
+        soul_result = await _call_orchestrator_skill(r, "soul_check", timeout=15)
+        skills_called.append("soul_check")
+
+        if soul_result.get("error") or soul_result.get("status") == "tampered":
+            try:
+                import pathlib, hashlib
+                souls_dir = pathlib.Path(BRAIN_PATH) / "agents" / "souls"
+                soul_data = {}
+                for md_file in sorted(souls_dir.glob("*.md")):
+                    content = md_file.read_text(encoding="utf-8")
+                    if content.strip():
+                        soul_data[md_file.stem] = content
+                if soul_data:
+                    soul_blob = json.dumps(soul_data, ensure_ascii=False, sort_keys=True)
+                    soul_hash = hashlib.sha256(soul_blob.encode()).hexdigest()[:16]
+                    await r.set("openclaw:soul", soul_blob)
+                    await r.set("openclaw:soul:hash", soul_hash)
+                    repairs.append(f"SOUL 重建: {len(soul_data)} 身份 (hash={soul_hash})")
+                    await _call_orchestrator_skill(r, "soul_accept", timeout=10)
+                    skills_called.append("soul_accept")
+                else:
+                    failures.append("SOUL: souls 目录无有效 .md 文件")
+            except Exception as e:
+                failures.append(f"SOUL 重建失败: {str(e)[:100]}")
+        else:
+            repairs.append(f"SOUL 检查通过: {soul_result.get('status', 'ok')}")
+
+    # ── 4. 记忆系统健康 — 调用 orchestrator skills ──
+    memory_issues = [r_ for r_ in reasons if "记忆" in r_ or "memory" in r_.lower()]
+    if memory_issues or health.get("memory_entities", 0) == 0:
+        mem_health = await _call_orchestrator_skill(r, "memory_health", timeout=20)
+        skills_called.append("memory_health")
+
+        orphans = mem_health.get("graph", {}).get("orphan_nodes", 0) if isinstance(mem_health, dict) else 0
+        if orphans > 10 or memory_issues:
+            compress_result = await _call_orchestrator_skill(r, "memory_compress", timeout=30)
+            skills_called.append("memory_compress")
+            repairs.append(f"记忆压缩: orphans={orphans}, 已执行 compress")
+
+        remind_result = await _call_orchestrator_skill(r, "memory_remind", timeout=20)
+        skills_called.append("memory_remind")
+        repairs.append("记忆提醒: 已触发跨 Agent 冗余扫描")
+
+    # ── 5. 自学习 — 反思引擎 ──
+    failing = health.get("failing_agents", [])
+    if failing:
+        stats_result = await _call_orchestrator_skill(r, "reflect_stats", timeout=15)
+        skills_called.append("reflect_stats")
+        repairs.append(f"反思统计: 已分析 Agent 失败率 ({', '.join(failing)})")
+
+    insight_result = await _call_orchestrator_skill(r, "reflect_insight", timeout=15)
+    skills_called.append("reflect_insight")
+    insight_text = ""
+    if isinstance(insight_result, dict):
+        insight_text = insight_result.get("text", "")
+    repairs.append(f"自学习洞察: {insight_text[:100] if insight_text else '已执行'}")
+
+    # ── 6. 长时间未挖掘 → 触发挖掘 ──
+    for reason in reasons:
+        if "未进行因子挖掘" in reason:
+            mine_msg = json.dumps({
+                "id": f"selfimprove_mine_{int(time.time())}",
+                "sender": "selfimprove", "target": "orchestrator",
+                "action": "mine_factors",
+                "params": {"themes": ["volatility_regime", "mean_reversion"], "count": 1},
+                "timestamp": time.time(),
+            })
+            await r.publish("openclaw:orchestrator", mine_msg)
+            repairs.append("因子挖掘: 已触发轻量挖掘 (2 themes x 1 round)")
+            break
+
+    # ── 7. n8n 连通性自检 ──
+    try:
+        n8n_check = _sp.run(
+            ["curl", "-s", "--max-time", "3", "http://127.0.0.1:5678/healthz"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if '"ok"' in n8n_check.stdout:
+            repairs.append("n8n: 连通正常")
+        else:
+            msg = await _launchctl_restart("n8n", "com.openclaw.n8n")
+            if msg.startswith("FAIL:"):
+                failures.append(msg[5:])
+            else:
+                repairs.append(f"n8n: {msg}")
+    except Exception as e:
+        failures.append(f"n8n 检测异常: {str(e)[:100]}")
+
+    # ── 8. capability-evolver 自修复 ──
+    evolver_health = {}
+    try:
+        repair_result = await _run_evolver_op(
+            'const sr = require("./src/ops/self_repair");'
+            'console.log(JSON.stringify(sr.repair()));',
+            timeout=20,
+        )
+        if isinstance(repair_result, list) and repair_result:
+            repairs.append(f"evolver git 修复: {', '.join(repair_result)}")
+        skills_called.append("evolver.self_repair")
+
+        hc_result = await _run_evolver_op(
+            'const hc = require("./src/ops/health_check");'
+            'console.log(JSON.stringify(hc.runHealthCheck()));',
+            timeout=15,
+        )
+        evolver_health = hc_result
+        skills_called.append("evolver.health_check")
+
+        if isinstance(hc_result, dict):
+            for check in hc_result.get("checks", []):
+                if not check.get("ok"):
+                    sev = check.get("severity", "info")
+                    desc = f"evolver: {check['name']}={check.get('status', '?')}"
+                    if sev == "critical":
+                        failures.append(desc)
+                    elif sev == "warning":
+                        repairs.append(f"[warn] {desc}")
+    except Exception as e:
+        failures.append(f"evolver 调用异常: {str(e)[:100]}")
+
+    # ── 9. capability-evolver 进化触发 ──
+    has_critical = any("FAIL:" in f or "critical" in f.lower() for f in failures)
+    if not has_critical and (repairs or reasons):
+        try:
+            trigger_result = await _run_evolver_op(
+                'const t = require("./src/ops/trigger");'
+                'console.log(JSON.stringify({sent: t.send()}));',
+                timeout=10,
+            )
+            if isinstance(trigger_result, dict) and trigger_result.get("sent"):
+                repairs.append("evolver: 进化唤醒信号已发送")
+            skills_called.append("evolver.trigger")
+        except Exception as e:
+            pass  # 进化触发是可选的，不影响整体
+
+    # ── 10. self-improving 学习反馈 ──
+    corrections_logged = 0
+    try:
+        corrections = []
+        for rep in repairs:
+            corrections.append({
+                "type": "repair_success",
+                "detail": rep,
+                "timestamp": time.time(),
+            })
+        for fail in failures:
+            corrections.append({
+                "type": "repair_failure",
+                "detail": fail,
+                "timestamp": time.time(),
+            })
+        if corrections:
+            await r.lpush(
+                "openclaw:selfimprove:corrections",
+                *[json.dumps(c, ensure_ascii=False) for c in corrections],
+            )
+            await r.ltrim("openclaw:selfimprove:corrections", 0, 499)
+            corrections_logged = len(corrections)
+            skills_called.append("self_improving.corrections")
+    except Exception as e:
+        pass  # 学习反馈写入失败不影响整体
+
+    # ── 11. 重新验证 ──
+    await asyncio.sleep(3)
+    post_health = await n8n_system_health()
+    still_broken = post_health.get("selfimprove_reasons", [])
+
+    # ── 12. 记录事件 + 通知 ──
+    event = {
+        "type": "selfimprove_done",
+        "repairs": repairs,
+        "failures": failures,
+        "skills_called": skills_called,
+        "remaining_issues": still_broken,
+        "evolver_health": evolver_health,
+        "corrections_logged": corrections_logged,
+        "timestamp": time.time(),
+    }
+    await r.lpush("openclaw:n8n:events", json.dumps(event, ensure_ascii=False, default=str))
+    await r.ltrim("openclaw:n8n:events", 0, 99)
+
+    return {
+        "ok": len(failures) == 0 and len(still_broken) == 0,
+        "repairs": repairs,
+        "failures": failures,
+        "skills_called": skills_called,
+        "remaining_issues": still_broken,
+        "evolver_health": evolver_health,
+        "corrections_logged": corrections_logged,
+        "insight": insight_text[:200] if insight_text else "",
+    }
+
+
+@app.post("/api/n8n/trigger/auto-promote")
+async def n8n_trigger_auto_promote(request: Request):
+    """n8n 触发: 检查是否有新的高质量因子可策略化推送。
+
+    与 promote 不同，此接口先检查是否有新的未策略化因子，
+    有才执行推送，否则直接返回 skip。适合高频调用。
+    """
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    min_sharpe = body.get("min_sharpe", 1.0)
+    max_per_run = body.get("max_per_run", 3)
+
+    _ensure_brain_path()
+    from agents.factor_library import FactorLibrary
+    r = await get_redis()
+    lib = FactorLibrary(redis_client=r)
+
+    # 快速检查: 是否有新的未策略化因子
+    raw_strats = await r.hgetall(STRATEGY_REDIS_KEY)
+    strategized_fids = set()
+    for v in raw_strats.values():
+        try:
+            s = json.loads(v)
+            if s.get("factor_id"):
+                strategized_fids.add(s["factor_id"])
+        except Exception:
+            pass
+
+    all_factors = await lib.get_all_factors(status="active")
+    candidates = [f for f in all_factors
+                  if f.id not in strategized_fids and f.sharpe >= min_sharpe]
+    candidates.sort(key=lambda f: f.sharpe, reverse=True)
+    targets = candidates[:max_per_run]
+
+    if not targets:
+        return {"ok": True, "action": "skip", "message": "无新因子需要策略化", "new_count": 0}
+
+    # 有新因子 — 转发给 promote 执行
+    from agents.bridge_client import get_bridge_client
+    from agents.factor_quality import metrics_audit
+    from datetime import date, timedelta
+
+    async def _run():
+        bridge = get_bridge_client()
+        rd = await get_redis()
+        promoted = []
+
+        for factor in targets:
+            try:
+                entry_pct = 0.95
+                exit_pct = 0.70
+                strategy_code = factor.code + f"""
+
+def generate_signals(matrices):
+    factor = generate_factor(matrices)
+    close = matrices['close']
+    rank_pct = factor.rank(axis=1, pct=True)
+    factor_rising = factor > factor.shift(1)
+    entries = (rank_pct > {entry_pct}) & factor_rising
+    ma5 = close.rolling(5).mean()
+    exits = (rank_pct < {exit_pct}) | (close < ma5)
+    entries = entries.fillna(False)
+    exits = exits.fillna(False)
+    return entries, exits
+"""
+                start_date = (date.today() - timedelta(days=180)).isoformat()
+                end_date = date.today().isoformat()
+
+                resp = await bridge.run_alpha(
+                    alpha_code=strategy_code,
+                    start_date=start_date, end_date=end_date,
+                    mode="technical",
+                )
+                bt_metrics = resp.get("metrics", {})
+                if resp.get("status") == "error":
+                    continue
+
+                qr = metrics_audit(bt_metrics)
+                if not qr.passed:
+                    continue
+
+                strat_id = f"strat_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+                theme = factor.sub_theme or factor.theme
+                strat_record = {
+                    "id": strat_id,
+                    "title": f"[{theme}] Sharpe={factor.sharpe:.2f}",
+                    "description": f"基于因子 {factor.id} ({theme}) 自动策略化",
+                    "source": "auto_promote", "factor_id": factor.id,
+                    "factor_theme": theme, "factor_sharpe": factor.sharpe,
+                    "code": strategy_code, "metrics": bt_metrics,
+                    "params": {"entry_pct": entry_pct, "exit_pct": exit_pct},
+                    "status": "draft", "synced_to_139": False,
+                    "quality_grade": qr.grade, "quality_score": qr.score,
+                    "created_at": time.time(),
+                }
+                await rd.hset(STRATEGY_REDIS_KEY, strat_id, json.dumps(strat_record, ensure_ascii=False, default=str))
+
+                try:
+                    await bridge._post("/strategy/deploy/", {
+                        "strategy_id": strat_id, "code": strategy_code,
+                        "filename": f"{strat_id}.py",
+                    })
+                    await bridge.save_strategy(
+                        title=f"[因子] {theme} Sharpe={factor.sharpe:.2f}",
+                        strategy_code=strategy_code,
+                        backtest_metrics=bt_metrics,
+                        status="APPROVE", topic=theme,
+                        model_used="rrclaw-auto-promote",
+                    )
+                    strat_record["synced_to_139"] = True
+                    strat_record["status"] = "synced"
+                    await rd.hset(STRATEGY_REDIS_KEY, strat_id, json.dumps(strat_record, ensure_ascii=False, default=str))
+                except Exception as e:
+                    logger.warning("auto-promote: sync to 139 failed for %s: %s", strat_id, e)
+
+                promoted.append({
+                    "strategy_id": strat_id, "factor_id": factor.id,
+                    "theme": theme, "sharpe": factor.sharpe,
+                    "quality_grade": qr.grade,
+                })
+                await asyncio.sleep(2)
+            except Exception as e:
+                logger.error("auto-promote: factor %s failed: %s", factor.id, e)
+
+        if promoted:
+            event = {
+                "type": "auto_promote_done",
+                "promoted": len(promoted),
+                "strategies": promoted,
+                "timestamp": time.time(),
+            }
+            await rd.lpush("openclaw:n8n:events", json.dumps(event, default=str))
+            await rd.ltrim("openclaw:n8n:events", 0, 99)
+
+    asyncio.create_task(_run())
+    return {
+        "ok": True, "action": "promoting",
+        "message": f"发现 {len(targets)} 个新因子待策略化",
+        "new_count": len(targets),
+        "factors": [{"id": f.id, "theme": f.theme, "sharpe": f.sharpe} for f in targets],
+    }
+
+
+# ── Factor Evolution & Pool Classification ──────────────────────────────────
+
+@app.post("/api/n8n/trigger/evolve-factors")
+async def n8n_trigger_evolve_factors(request: Request):
+    """n8n 触发: 批量进化因子参数，连续3次失败降入低因子池。
+
+    Body (可选):
+      max_factors: int = 20   每批进化的因子数
+    """
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    max_factors = int(body.get("max_factors", 20))
+
+    _ensure_brain_path()
+    from agents.factor_evolver import run_batch_evolution
+    from agents.factor_library import FactorLibrary
+    from agents.bridge_client import get_bridge_client
+
+    async def _run():
+        lib = FactorLibrary(redis_client=await get_redis())
+        bridge = get_bridge_client()
+        rd = await get_redis()
+
+        async def _notify(text: str):
+            await rd.lpush("openclaw:n8n:events",
+                           json.dumps({"type": "evolve", "message": text, "timestamp": time.time()}))
+            await rd.ltrim("openclaw:n8n:events", 0, 99)
+
+        result = await run_batch_evolution(lib, bridge, notify_fn=_notify, max_factors=max_factors)
+        event = {"type": "evolve_done", "timestamp": time.time(), **result}
+        await rd.lpush("openclaw:n8n:events", json.dumps(event, default=str))
+        await rd.ltrim("openclaw:n8n:events", 0, 99)
+        return result
+
+    asyncio.create_task(_run())
+    return {"action": "evolving", "max_factors": max_factors}
+
+
+@app.post("/api/n8n/trigger/classify-factors")
+async def n8n_trigger_classify_factors(request: Request):
+    """n8n 触发: 对所有 active 因子重新分类到 high_pool / low_pool。
+
+    high_pool: sharpe >= 1.5 AND win_rate >= 50%
+    low_pool:  evolution_failures >= 3
+    """
+    _ensure_brain_path()
+    from agents.factor_library import FactorLibrary
+
+    lib = FactorLibrary(redis_client=await get_redis())
+    counts = await lib.classify_all_factors()
+
+    rd = await get_redis()
+    event = {"type": "classify_done", "timestamp": time.time(), **counts}
+    await rd.lpush("openclaw:n8n:events", json.dumps(event))
+    await rd.ltrim("openclaw:n8n:events", 0, 99)
+
+    logger.info("因子分类完成: high=%d low=%d active=%d",
+                counts["high_pool"], counts["low_pool"], counts["active"])
+    return {"action": "classified", **counts}
+
+
+@app.post("/api/n8n/trigger/push-screener-groups")
+async def n8n_trigger_push_screener_groups(request: Request):
+    """n8n 触发: 将高因子池中的因子推送到 139 screener，按 pool_score(sharpe*胜率) 排序。
+
+    Body (可选):
+      top_n: int = 30        推送前 N 个高池因子
+      group_size: int = 5    每组因子数 (组合成一个 screener preset)
+      min_pool_score: float = 0.6  最低 pool_score 门槛
+    """
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    top_n = int(body.get("top_n", 30))
+    group_size = int(body.get("group_size", 5))
+    min_score = float(body.get("min_pool_score", 0.6))
+
+    _ensure_brain_path()
+    from agents.factor_library import FactorLibrary
+    from agents.bridge_client import get_bridge_client
+
+    lib = FactorLibrary(redis_client=await get_redis())
+    bridge = get_bridge_client()
+    rd = await get_redis()
+
+    high_factors = await lib.get_high_pool_factors(limit=top_n)
+    high_factors = [f for f in high_factors if getattr(f, "pool_score", 0) >= min_score]
+
+    if not high_factors:
+        return {"action": "push_screener", "pushed_groups": 0,
+                "message": f"无符合条件的高池因子 (pool_score >= {min_score})"}
+
+    pushed = []
+    errors = []
+
+    # 按 pool_score 降序，每 group_size 个因子组成一个 screener 因子组
+    for group_idx, start in enumerate(range(0, len(high_factors), group_size)):
+        group = high_factors[start:start + group_size]
+        rank = group_idx + 1
+        avg_sharpe = sum(f.sharpe for f in group) / len(group)
+        avg_wr = sum((f.win_rate if f.win_rate <= 1 else f.win_rate / 100) for f in group) / len(group)
+
+        # 主题分布
+        themes = list(dict.fromkeys(f.theme for f in group))[:3]
+        theme_label = "+".join(t.replace("_", "")[:6] for t in themes)
+        group_name = f"{rank:02d}_高池因子组_{theme_label}"
+        group_slug = f"high-pool-group-{rank:02d}"
+
+        # 构建组合因子代码: 等权合并各因子的截面 rank
+        code_parts = []
+        for fi, fac in enumerate(group):
+            fn_name = f"generate_factor_{fi}"
+            renamed = fac.code.replace("def generate_factor(", f"def {fn_name}(")
+            code_parts.append(renamed)
+
+        combine_calls = "\n    ".join(
+            f'scores.append({fn}(matrices).rank(axis=1, pct=True).fillna(0))'
+            for fn in [f"generate_factor_{i}" for i in range(len(group))]
+        )
+        combined_code = "\n\n".join(code_parts) + f"""
+
+import numpy as np
+import pandas as pd
+
+def generate_factor(matrices):
+    scores = []
+    {combine_calls}
+    return sum(scores) / len(scores)
+"""
+
+        # 构建 screener preset payload
+        preset_payload = {
+            "version": "1.0",
+            "execution_mode": "factor_code",
+            "meta": {
+                "name": group_name,
+                "owner": "openclaw-high-pool",
+                "trade_date": "auto",
+                "pool": "high_pool",
+                "rank": rank,
+                "avg_sharpe": round(avg_sharpe, 3),
+                "avg_win_rate": round(avg_wr, 3),
+                "pool_score": round(sum(getattr(f, "pool_score", 0) for f in group) / len(group), 3),
+                "factor_ids": [f.id for f in group],
+            },
+            "universe": {"mode": "all", "exclude": ["*ST", "ST"]},
+            "timeframes": [{"id": "D1", "calendar": "trading", "lookback_bars": 60}],
+            "filters": {},
+            "outputs": {
+                "limit": 50,
+                "fields": ["ts_code", "factor_score"],
+                "order_by": [{"factor": "factor_score", "direction": "desc"}],
+            },
+            "code": combined_code,
+            "backtest_metrics": {
+                "sharpe_ratio": avg_sharpe,
+                "win_rate_pct": avg_wr * 100,
+            },
+        }
+
+        try:
+            resp = await bridge._post("/strategy/register-preset/", {
+                "slug": group_slug,
+                "name": group_name,
+                "description": (
+                    f"高池因子组 #{rank} | "
+                    f"主题: {', '.join(themes)} | "
+                    f"Sharpe={avg_sharpe:.2f} 胜率={avg_wr*100:.1f}% "
+                    f"(pool_score={preset_payload['meta']['pool_score']:.3f})"
+                ),
+                "category": "factor_group",
+                "payload": preset_payload,
+            })
+            pushed.append({
+                "slug": group_slug,
+                "name": group_name,
+                "factors": len(group),
+                "avg_sharpe": avg_sharpe,
+                "avg_win_rate": avg_wr,
+            })
+            logger.info("screener 因子组推送成功: %s (sharpe=%.2f)", group_slug, avg_sharpe)
+        except Exception as e:
+            errors.append(f"{group_slug}: {e}")
+            logger.error("screener 因子组推送失败: %s %s", group_slug, e)
+
+    event = {
+        "type": "push_screener_done",
+        "timestamp": time.time(),
+        "pushed_groups": len(pushed),
+        "total_factors": len(high_factors),
+        "errors": len(errors),
+    }
+    await rd.lpush("openclaw:n8n:events", json.dumps(event))
+    await rd.ltrim("openclaw:n8n:events", 0, 99)
+
+    return {
+        "action": "push_screener",
+        "pushed_groups": len(pushed),
+        "total_factors": len(high_factors),
+        "groups": pushed,
+        "errors": errors,
+    }
+
+
+# ── Strategy Optimization (n8n) ───────────────────────
+
+@app.post("/api/n8n/trigger/optimize-strategies")
+async def n8n_trigger_optimize_strategies(request: Request):
+    """n8n 触发: 策略优化 — 参数调优 + 因子叠加, 回测更优则入库。
+
+    优化方式:
+    1. 参数调优: 对已有策略尝试不同 entry_pct / exit_pct 组合
+    2. 因子叠加: 从因子库选高质量因子叠加到已有策略代码上
+    回测效果优于原始策略则存为新策略模板。
+    """
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    max_strategies = body.get("max_strategies", 5)
+    max_variants = body.get("max_variants", 6)
+    improvement_threshold = body.get("improvement_threshold", 0.05)
+
+    _ensure_brain_path()
+    from agents.factor_library import FactorLibrary
+    r = await get_redis()
+    lib = FactorLibrary(redis_client=r)
+
+    raw_strats = await r.hgetall(STRATEGY_REDIS_KEY)
+    strats = []
+    for v in raw_strats.values():
+        try:
+            s = json.loads(v)
+            if s.get("code") and s.get("source") in ("factor", "auto_promote") and s.get("factor_id"):
+                strats.append(s)
+        except Exception:
+            pass
+
+    if not strats:
+        return {"ok": True, "action": "skip", "message": "无可优化策略", "optimized": 0}
+
+    strats.sort(key=lambda x: x.get("factor_sharpe", 0), reverse=True)
+    targets = strats[:max_strategies]
+
+    all_factors = await lib.get_all_factors(status="active")
+    top_factors = sorted(all_factors, key=lambda f: f.sharpe, reverse=True)[:20]
+
+    async def _run():
+        from agents.bridge_client import get_bridge_client
+        from agents.factor_quality import metrics_audit
+        from datetime import date, timedelta
+        import random
+
+        bridge = get_bridge_client()
+        rd = await get_redis()
+        optimized = []
+
+        start_date = (date.today() - timedelta(days=180)).isoformat()
+        end_date = date.today().isoformat()
+
+        for strat in targets:
+            strat_id = strat["id"]
+            original_metrics = strat.get("metrics", {})
+            original_sharpe = float(original_metrics.get("sharpe_ratio") or original_metrics.get("sharpe", 0) or strat.get("factor_sharpe", 0))
+            original_code = strat.get("code", "")
+            original_params = strat.get("params", {})
+            factor_id = strat.get("factor_id", "")
+
+            if not original_code or original_sharpe <= 0:
+                continue
+
+            best_sharpe = original_sharpe
+            best_code = None
+            best_params = None
+            best_metrics = None
+            best_method = None
+            variants_tested = 0
+
+            # --- 方式1: 参数调优 ---
+            orig_entry = original_params.get("entry_pct", 0.95)
+            orig_exit = original_params.get("exit_pct", 0.70)
+            param_variants = [
+                (0.90, 0.60), (0.92, 0.65), (0.93, 0.70),
+                (0.95, 0.75), (0.97, 0.65), (0.98, 0.60),
+            ]
+            param_variants = [(e, x) for e, x in param_variants
+                              if abs(e - orig_entry) > 0.005 or abs(x - orig_exit) > 0.005]
+            random.shuffle(param_variants)
+
+            base_code = original_code.split("def generate_signals(")[0].strip()
+
+            for entry_pct, exit_pct in param_variants[:max_variants // 2]:
+                variant_code = base_code + f"""
+
+def generate_signals(matrices):
+    factor = generate_factor(matrices)
+    close = matrices['close']
+    rank_pct = factor.rank(axis=1, pct=True)
+    factor_rising = factor > factor.shift(1)
+    entries = (rank_pct > {entry_pct}) & factor_rising
+    ma5 = close.rolling(5).mean()
+    exits = (rank_pct < {exit_pct}) | (close < ma5)
+    entries = entries.fillna(False)
+    exits = exits.fillna(False)
+    return entries, exits
+"""
+                try:
+                    resp = await bridge.run_alpha(
+                        alpha_code=variant_code,
+                        start_date=start_date, end_date=end_date,
+                        mode="technical",
+                    )
+                    variants_tested += 1
+                    if resp.get("status") == "error":
+                        continue
+                    m = resp.get("metrics", {})
+                    s = float(m.get("sharpe_ratio") or m.get("sharpe", 0))
+                    if s > best_sharpe * (1 + improvement_threshold):
+                        best_sharpe = s
+                        best_code = variant_code
+                        best_params = {"entry_pct": entry_pct, "exit_pct": exit_pct}
+                        best_metrics = m
+                        best_method = f"参数调优 entry={entry_pct} exit={exit_pct}"
+                except Exception:
+                    pass
+                await asyncio.sleep(2)
+
+            # --- 方式2: 因子叠加 ---
+            strat_factor_ids = {factor_id} if factor_id else set()
+            overlay_candidates = [f for f in top_factors if f.id not in strat_factor_ids]
+            random.shuffle(overlay_candidates)
+
+            for overlay_f in overlay_candidates[:max_variants // 2]:
+                overlay_renamed = overlay_f.code.replace(
+                    "def generate_factor(", "def _overlay_factor("
+                )
+                overlay_code = base_code + "\n\n" + overlay_renamed + """
+
+import numpy as np
+import pandas as pd
+
+def generate_factor(matrices):
+    f1 = _original_factor(matrices)
+    try:
+        f2 = _overlay_factor(matrices)
+    except Exception:
+        return f1
+    s = np.stack([f1.values, f2.values], axis=0)
+    combined = np.nanmean(s, axis=0)
+    return pd.DataFrame(combined, index=f1.index, columns=f1.columns)
+"""
+                overlay_code = overlay_code.replace(
+                    base_code.split("def generate_factor(")[0] + "def generate_factor(",
+                    base_code.split("def generate_factor(")[0] + "def _original_factor(",
+                    1,
+                )
+                entry_pct = best_params["entry_pct"] if best_params else orig_entry
+                exit_pct = best_params["exit_pct"] if best_params else orig_exit
+                overlay_code += f"""
+def generate_signals(matrices):
+    factor = generate_factor(matrices)
+    close = matrices['close']
+    rank_pct = factor.rank(axis=1, pct=True)
+    factor_rising = factor > factor.shift(1)
+    entries = (rank_pct > {entry_pct}) & factor_rising
+    ma5 = close.rolling(5).mean()
+    exits = (rank_pct < {exit_pct}) | (close < ma5)
+    entries = entries.fillna(False)
+    exits = exits.fillna(False)
+    return entries, exits
+"""
+                try:
+                    resp = await bridge.run_alpha(
+                        alpha_code=overlay_code,
+                        start_date=start_date, end_date=end_date,
+                        mode="technical",
+                    )
+                    variants_tested += 1
+                    if resp.get("status") == "error":
+                        continue
+                    m = resp.get("metrics", {})
+                    s = float(m.get("sharpe_ratio") or m.get("sharpe", 0))
+                    if s > best_sharpe * (1 + improvement_threshold):
+                        best_sharpe = s
+                        best_code = overlay_code
+                        best_params = {"entry_pct": entry_pct, "exit_pct": exit_pct, "overlay_factor": overlay_f.id}
+                        best_metrics = m
+                        best_method = f"因子叠加 +{overlay_f.theme}/{overlay_f.id}"
+                except Exception:
+                    pass
+                await asyncio.sleep(2)
+
+            # --- 保存最优变体 ---
+            if best_code and best_metrics:
+                qr = metrics_audit(best_metrics)
+                if not qr.passed:
+                    continue
+
+                new_id = f"strat_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+                theme = strat.get("factor_theme", "optimized")
+                new_record = {
+                    "id": new_id,
+                    "title": f"[优化] {theme} Sharpe={best_sharpe:.2f}",
+                    "description": f"基于 {strat_id} 优化 ({best_method}), 原Sharpe={original_sharpe:.2f}->{best_sharpe:.2f}",
+                    "source": "optimize",
+                    "base_strategy_id": strat_id,
+                    "factor_id": factor_id,
+                    "factor_theme": theme,
+                    "factor_sharpe": best_sharpe,
+                    "code": best_code,
+                    "metrics": best_metrics,
+                    "params": best_params,
+                    "optimize_method": best_method,
+                    "original_sharpe": original_sharpe,
+                    "status": "draft",
+                    "synced_to_139": False,
+                    "quality_grade": qr.grade,
+                    "quality_score": qr.score,
+                    "created_at": time.time(),
+                }
+                await rd.hset(STRATEGY_REDIS_KEY, new_id, json.dumps(new_record, ensure_ascii=False, default=str))
+
+                try:
+                    await bridge._post("/strategy/deploy/", {
+                        "strategy_id": new_id, "code": best_code,
+                        "filename": f"{new_id}.py",
+                    })
+                    await bridge.save_strategy(
+                        title=f"[优化] {theme} Sharpe={best_sharpe:.2f}",
+                        strategy_code=best_code,
+                        backtest_metrics=best_metrics,
+                        status="APPROVE", topic=theme,
+                        model_used="rrclaw-optimize",
+                    )
+                    new_record["synced_to_139"] = True
+                    new_record["status"] = "synced"
+                    await rd.hset(STRATEGY_REDIS_KEY, new_id, json.dumps(new_record, ensure_ascii=False, default=str))
+                except Exception as e:
+                    logger.warning("optimize: sync to 139 failed for %s: %s", new_id, e)
+
+                optimized.append({
+                    "new_strategy_id": new_id,
+                    "base_strategy_id": strat_id,
+                    "theme": theme,
+                    "method": best_method,
+                    "original_sharpe": original_sharpe,
+                    "new_sharpe": best_sharpe,
+                    "improvement": f"+{((best_sharpe/original_sharpe)-1)*100:.1f}%",
+                    "quality_grade": qr.grade,
+                    "variants_tested": variants_tested,
+                })
+                await asyncio.sleep(2)
+
+        if optimized:
+            event = {
+                "type": "strategy_optimize_done",
+                "optimized": len(optimized),
+                "strategies": optimized,
+                "timestamp": time.time(),
+            }
+            await rd.lpush("openclaw:n8n:events", json.dumps(event, default=str))
+            await rd.ltrim("openclaw:n8n:events", 0, 99)
+        else:
+            event = {
+                "type": "strategy_optimize_done",
+                "optimized": 0,
+                "message": f"测试了 {len(targets)} 个策略但未找到显著改进",
+                "timestamp": time.time(),
+            }
+            await rd.lpush("openclaw:n8n:events", json.dumps(event, default=str))
+            await rd.ltrim("openclaw:n8n:events", 0, 99)
+
+    asyncio.create_task(_run())
+    return {
+        "ok": True, "action": "optimizing",
+        "message": f"开始优化 {len(targets)} 个策略 (参数调优 + 因子叠加)",
+        "target_count": len(targets),
+        "strategies": [{"id": s["id"], "theme": s.get("factor_theme", ""), "sharpe": s.get("factor_sharpe", 0)} for s in targets],
+    }
+
+
+# ── autoresearch-mlx ───────────────────────────────────
+
+_AUTORESEARCH_DIR = "/Users/zayl/OpenClaw-Universe/autoresearch-mlx"
+_AUTORESEARCH_RUNNING: dict = {}  # track running experiment
+
+
+@app.post("/api/n8n/trigger/autoresearch")
+async def n8n_trigger_autoresearch(request: Request):
+    """n8n 触发: autoresearch-mlx 自主 LLM 训练实验。
+
+    启动 Claude Code agent 执行 program.md 中定义的自主实验循环。
+    每次实验: 修改 train.py -> 训练 5 分钟 -> 评估 val_bpb -> 保留/丢弃。
+
+    参数:
+        max_experiments: 最大实验次数 (默认 5)
+        timeout_minutes: 总超时 (默认 60)
+    """
+    try:
+        return await _do_autoresearch(request)
+    except Exception as e:
+        import traceback
+        logger.error(f"autoresearch error: {traceback.format_exc()}")
+        return {"ok": False, "error": str(e)[:500]}
+
+
+async def _do_autoresearch(request: Request):
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    max_experiments = body.get("max_experiments", 5)
+    timeout_minutes = body.get("timeout_minutes", 60)
+    model = body.get("model", "haiku")
+
+    import subprocess as _sp
+
+    # 检查是否已有实验在运行
+    if _AUTORESEARCH_RUNNING.get("pid"):
+        pid = _AUTORESEARCH_RUNNING["pid"]
+        import subprocess as _sp2
+        ps_check = _sp2.run(["ps", "-p", str(pid), "-o", "state="], capture_output=True, text=True)
+        state = ps_check.stdout.strip()
+        if ps_check.returncode == 0 and state and "Z" not in state:
+            return {
+                "ok": True, "action": "already_running",
+                "message": f"autoresearch 实验已在运行 (PID {pid})",
+                "started_at": _AUTORESEARCH_RUNNING.get("started_at"),
+            }
+        else:
+            _AUTORESEARCH_RUNNING.clear()
+
+    # 检查目录和数据
+    run_script = os.path.join(_AUTORESEARCH_DIR, "_run_experiment.sh")
+    for check_path, label in [
+        (os.path.join(_AUTORESEARCH_DIR, "train.py"), "train.py"),
+        (run_script, "_run_experiment.sh"),
+        ("/Users/zayl/.cache/autoresearch/data", "training data"),
+    ]:
+        chk = _sp.run(["sudo", "-u", "zayl", "test", "-e", check_path], capture_output=True)
+        if chk.returncode != 0:
+            return {"ok": False, "error": f"autoresearch-mlx: {label} not found at {check_path}"}
+
+    tag = time.strftime("%Y%m%d_%H%M%S")
+    log_dir = os.path.join(_AUTORESEARCH_DIR, "logs")
+    log_file = os.path.join(log_dir, f"{tag}.log")
+
+    _sp.run(["sudo", "-u", "zayl", "mkdir", "-p", log_dir], capture_output=True)
+
+    # 启动 _run_experiment.sh (内部调用 Claude Code CLI 进行自主实验)
+    import getpass as _gp
+    shell_cmd = f"bash {run_script} {max_experiments} {timeout_minutes} {model}"
+    if _gp.getuser() == "zayl":
+        cmd = ["bash", "-c", shell_cmd]
+    else:
+        cmd = ["sudo", "-u", "zayl", "-H", "-i", "bash", "-c", shell_cmd]
+
+    proc = _sp.Popen(
+        cmd,
+        stdout=_sp.DEVNULL,
+        stderr=_sp.DEVNULL,
+        cwd="/tmp",
+        start_new_session=True,
+    )
+
+    _AUTORESEARCH_RUNNING.update({
+        "pid": proc.pid,
+        "started_at": time.time(),
+        "tag": tag,
+        "log_file": log_file,
+        "max_experiments": max_experiments,
+    })
+
+    # 记录事件
+    r = await get_redis()
+    event = {
+        "type": "autoresearch_started",
+        "tag": tag,
+        "pid": proc.pid,
+        "max_experiments": max_experiments,
+        "timestamp": time.time(),
+    }
+    await r.lpush("openclaw:n8n:events", json.dumps(event, ensure_ascii=False))
+    await r.ltrim("openclaw:n8n:events", 0, 99)
+
+    return {
+        "ok": True,
+        "action": "started",
+        "message": f"autoresearch 实验已启动 (model={model}, {max_experiments} 轮, 超时 {timeout_minutes}min)",
+        "pid": proc.pid,
+        "tag": tag,
+        "log_file": log_file,
+    }
+
+
+@app.get("/api/n8n/autoresearch/status")
+async def n8n_autoresearch_status(request: Request):
+    """获取 autoresearch 实验状态和最近结果。"""
+    result = {"running": False, "results": []}
+
+    # 检查运行状态
+    if _AUTORESEARCH_RUNNING.get("pid"):
+        try:
+            os.kill(_AUTORESEARCH_RUNNING["pid"], 0)
+            result["running"] = True
+            result["pid"] = _AUTORESEARCH_RUNNING["pid"]
+            result["started_at"] = _AUTORESEARCH_RUNNING.get("started_at")
+            result["tag"] = _AUTORESEARCH_RUNNING.get("tag")
+        except OSError:
+            _AUTORESEARCH_RUNNING.clear()
+
+    import subprocess as _sp
+    import re
+
+    # 读取 results.tsv (via sudo -u zayl)
+    tsv_path = os.path.join(_AUTORESEARCH_DIR, "results.tsv")
+    tsv_out = _sp.run(["sudo", "-u", "zayl", "cat", tsv_path], capture_output=True, text=True)
+    if tsv_out.returncode == 0 and tsv_out.stdout.strip():
+        lines = tsv_out.stdout.strip().split("\n")
+        if len(lines) > 1:
+            headers = lines[0].strip().split("\t")
+            for line in lines[1:]:
+                fields = line.strip().split("\t")
+                if len(fields) >= len(headers):
+                    result["results"].append(dict(zip(headers, fields)))
+
+    # 读取最新日志
+    log_file = _AUTORESEARCH_RUNNING.get("log_file")
+    if log_file:
+        tail_out = _sp.run(["sudo", "-u", "zayl", "tail", "-20", log_file], capture_output=True, text=True)
+        if tail_out.returncode == 0:
+            result["log_tail"] = tail_out.stdout
+
+    # best/latest val_bpb from results.tsv (more reliable than parsing logs)
+    kept = [r_ for r_ in result["results"] if r_.get("status") == "keep" and r_.get("val_bpb", "0") != "0.000000"]
+    if kept:
+        bpb_values = [float(r_["val_bpb"]) for r_ in kept]
+        result["best_val_bpb"] = min(bpb_values)
+        result["latest_val_bpb"] = bpb_values[-1]
+
+    # latest log tail for progress monitoring
+    log_dir = os.path.join(_AUTORESEARCH_DIR, "logs")
+    ls_out = _sp.run(
+        ["sudo", "-u", "zayl", "bash", "-c", f"ls -t {log_dir}/*.log 2>/dev/null | head -1"],
+        capture_output=True, text=True,
+    )
+    latest_log = ls_out.stdout.strip()
+    if latest_log and not log_file:
+        tail_out = _sp.run(["sudo", "-u", "zayl", "tail", "-20", latest_log], capture_output=True, text=True)
+        if tail_out.returncode == 0:
+            result["log_tail"] = tail_out.stdout
+
+    return result
+
+
 # ── Serve Frontend ───────────────────────────────────────
 
 FRONTEND_PATH = Path(__file__).parent / "static" / "index.html"
