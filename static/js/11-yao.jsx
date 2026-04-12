@@ -1,4 +1,4 @@
-// ── 妖股因子中心 (YaoView) ─────────────────────────────
+// ── 异动因子因子中心 (YaoView) ─────────────────────────────
 
 const YAO_THEME_COLORS = {
   yao_amplitude_compression: 'text-violet-400',
@@ -84,7 +84,7 @@ function YaoFactorTable({factors, loading}) {
   if (loading) return <div className="skeleton h-40 rounded-xl w-full"></div>;
   if (!factors || factors.length === 0) return (
     <div className="text-center text-zinc-600 text-sm py-8">
-      暂无妖股因子入库 — 等待挖掘结果...
+      暂无异动因子因子入库 — 等待挖掘结果...
     </div>
   );
   return (
@@ -176,7 +176,7 @@ function YaoSignalsList({signals, loading}) {
                 </td>
                 <td className="px-3 py-2 text-center">
                   <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium">
-                    🐉 妖股候选
+                    🐉 异动因子候选
                   </span>
                 </td>
               </tr>
@@ -249,7 +249,7 @@ function YaoView() {
   const fetchDashboard = React.useCallback(async (bust=false) => {
     setLoading(true);
     try {
-      const url = bust ? '/api/yao/dashboard?bust=1' : '/api/yao/dashboard';
+      const url = bust ? '/api/alpha-factor/dashboard?bust=1' : '/api/alpha-factor/dashboard';
       const r = await fetch(url, {headers: {'Authorization': `Bearer ${token}`}});
       if (r.ok) setData(await r.json());
     } catch(e) { console.error(e); }
@@ -267,7 +267,7 @@ function YaoView() {
   const handleIterate = async () => {
     setIterating(true);
     try {
-      const r = await fetch('/api/yao/iterate', {method:'POST',
+      const r = await fetch('/api/alpha-factor/iterate', {method:'POST',
         headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}});
       const d = await r.json();
       if (d.ok) {
@@ -283,7 +283,7 @@ function YaoView() {
   const handleRefreshSignals = async () => {
     setRefreshing(true);
     try {
-      const r = await fetch('/api/yao/signals/refresh', {method:'POST',
+      const r = await fetch('/api/alpha-factor/signals/refresh', {method:'POST',
         headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
         body: JSON.stringify({top_n: 3})});
       const d = await r.json();
@@ -311,7 +311,7 @@ function YaoView() {
               <span className="text-lg">🐉</span>
             </div>
             <div>
-              <h1 className="text-[15px] font-bold text-white tracking-tight">妖股因子中心</h1>
+              <h1 className="text-[15px] font-bold text-white tracking-tight">异动因子因子中心</h1>
               <p className="text-[10px] text-zinc-500">A股高弹性股票启动特征量化因子 · PBO过拟合检验 · 持续迭代优化</p>
             </div>
           </div>
@@ -353,7 +353,7 @@ function YaoView() {
           <>
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <YaoKpiCard icon="🐉" label="妖股因子" value={summ.total_factors ?? 0}
+              <YaoKpiCard icon="🐉" label="异动因子因子" value={summ.total_factors ?? 0}
                 sub={`覆盖 ${summ.total_themes || 0} 个主题`} color="text-rose-400" loading={loading} />
               <YaoKpiCard icon="🏆" label="最佳 Sharpe" value={summ.best_sharpe > 0 ? summ.best_sharpe?.toFixed(3) : '—'}
                 sub={`均值 ${summ.avg_sharpe > 0 ? summ.avg_sharpe?.toFixed(2) : '—'}`}
@@ -377,7 +377,7 @@ function YaoView() {
             {/* Top 5 factors preview */}
             <Card>
               <h3 className="text-[12px] font-semibold text-zinc-300 mb-3 flex items-center gap-2">
-                <span>🥇</span> TOP 5 妖股因子
+                <span>🥇</span> TOP 5 异动因子因子
               </h3>
               <YaoFactorTable factors={(data?.top_factors || []).slice(0,5)} loading={loading} />
             </Card>
@@ -403,7 +403,7 @@ function YaoView() {
             </Card>
             <Card>
               <h3 className="text-[12px] font-semibold text-zinc-300 mb-3 flex items-center justify-between">
-                <span className="flex items-center gap-2"><span>📋</span> 全部妖股因子 ({data?.top_factors?.length || 0})</span>
+                <span className="flex items-center gap-2"><span>📋</span> 全部异动因子因子 ({data?.top_factors?.length || 0})</span>
                 <span className="text-[10px] text-zinc-600 font-normal">按 Sharpe 降序</span>
               </h3>
               <YaoFactorTable factors={data?.top_factors} loading={loading} />
@@ -416,7 +416,7 @@ function YaoView() {
           <Card>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[12px] font-semibold text-zinc-300 flex items-center gap-2">
-                <span>🎯</span> 妖股候选信号
+                <span>🎯</span> 异动因子候选信号
               </h3>
               <button onClick={handleRefreshSignals} disabled={refreshing}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[10px] text-rose-400 hover:bg-rose-500/20 transition disabled:opacity-40">
@@ -425,7 +425,7 @@ function YaoView() {
             </div>
             <YaoSignalsList signals={data?.signals} loading={loading} />
             <div className="mt-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/15 text-[10px] text-amber-600">
-              ⚠️ 信号仅供参考，基于量化因子截面排序。妖股行情风险极高，请结合基本面和风控执行。
+              ⚠️ 信号仅供参考，基于量化因子截面排序。异动因子行情风险极高，请结合基本面和风控执行。
             </div>
           </Card>
         )}

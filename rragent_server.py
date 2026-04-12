@@ -564,7 +564,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # n8n service token
-        if (path.startswith("/api/n8n/") or path.startswith("/api/yao/")) and N8N_SERVICE_TOKEN:
+        if (path.startswith("/api/n8n/") or path.startswith("/api/alpha-factor/")) and N8N_SERVICE_TOKEN:
             token = request.headers.get("X-N8n-Token", "")
             if token == N8N_SERVICE_TOKEN:
                 request.state.user = {"sub": "n8n", "role": "service"}
@@ -2298,9 +2298,9 @@ async def n8n_trigger_mine(request: Request):
 
 # ── 妖股 Dashboard API ──────────────────────────────────
 
-@app.get("/api/yao/dashboard")
-async def yao_dashboard():
-    """妖股因子库全貌: 主题统计 / TOP 因子 / 最新信号 / 迭代日志。"""
+@app.get("/api/alpha-factor/dashboard")
+async def alpha_factor_dashboard():
+    """短线异动因子库全貌: 主题统计 / TOP 因子 / 最新信号 / 迭代日志。"""
     _ensure_brain_path()
     from agents.yao_optimizer import analyze_library, REDIS_KEY_DASH_CACHE
     r = await get_redis()
@@ -2318,9 +2318,9 @@ async def yao_dashboard():
     return await analyze_library(fl, r)
 
 
-@app.post("/api/yao/analyze")
-async def yao_analyze():
-    """运行一次完整的妖股库分析 + 主题权重更新 (n8n 调用)。"""
+@app.post("/api/alpha-factor/analyze")
+async def alpha_factor_analyze():
+    """运行一次完整的异动因子库分析 + 主题权重更新 (n8n 调用)。"""
     _ensure_brain_path()
     from agents.yao_optimizer import run_analysis_and_update
     from agents.factor_library import get_factor_library
@@ -2330,9 +2330,9 @@ async def yao_analyze():
     return {"ok": True, "result": result}
 
 
-@app.post("/api/yao/signals/refresh")
-async def yao_signals_refresh(request: Request):
-    """用 TOP 妖股因子跑实盘截面筛选，刷新信号缓存 (n8n 调用)。"""
+@app.post("/api/alpha-factor/signals/refresh")
+async def alpha_factor_signals_refresh(request: Request):
+    """用 TOP 异动因子跑实盘截面筛选，刷新信号缓存 (n8n 调用)。"""
     _ensure_brain_path()
     from agents.yao_optimizer import refresh_signals
     from agents.factor_library import get_factor_library
@@ -2346,8 +2346,8 @@ async def yao_signals_refresh(request: Request):
     return {"ok": True, "count": len(signals)}
 
 
-@app.post("/api/yao/iterate")
-async def yao_iterate(request: Request):
+@app.post("/api/alpha-factor/iterate")
+async def alpha_factor_iterate(request: Request):
     """根据当前主题权重触发一次针对性迭代挖掘 (前端手动触发 / n8n 调用)。"""
     _ensure_brain_path()
     from agents.yao_optimizer import get_focus_theme_for_next_session
@@ -2378,7 +2378,7 @@ async def yao_iterate(request: Request):
             }
             await log_iteration_event(r2, event)
         except Exception as e:
-            logger.error(f"yao_iterate failed: {e}")
+            logger.error(f"alpha_factor_iterate failed: {e}")
         finally:
             r3 = await get_redis()
             await r3.delete(_YAO_SESSION_LOCK_KEY)
@@ -2390,11 +2390,11 @@ async def yao_iterate(request: Request):
             "message": f"迭代挖掘已启动 → 重点主题: {theme_label}"}
 
 
-@app.post("/api/n8n/trigger/yao_mine")
-async def n8n_trigger_yao_mine(request: Request):
-    """n8n 触发: 启动一轮妖股因子挖掘。
+@app.post("/api/n8n/trigger/alpha_mine")
+async def n8n_trigger_alpha_mine(request: Request):
+    """n8n 触发: 启动一轮异动因子挖掘。
 
-    妖股因子专注于挖掘A股高弹性个股「启动前 1-3 天」的量价预测信号。
+    异动因子专注于挖掘A股高弹性个股「启动前 1-3 天」的量价预测信号。
     与普通 /mine 的区别: 主题池全部针对妖股特征，LLM 上下文注入妖股先验知识。
 
     Body 参数:
@@ -2438,7 +2438,7 @@ async def n8n_trigger_yao_mine(request: Request):
             await r2.lpush("openclaw:n8n:events", json.dumps(event, default=str))
             await r2.ltrim("openclaw:n8n:events", 0, 99)
         except Exception as e:
-            logger.error(f"yao_mine trigger failed: {e}")
+            logger.error(f"alpha_mine trigger failed: {e}")
         finally:
             r3 = await get_redis()
             await r3.delete(_YAO_SESSION_LOCK_KEY)
@@ -4819,6 +4819,29 @@ ID: {strategy_id}
         "warnings": errors if errors else None,
     }
 
+
+
+
+# ── Legacy URL Aliases (backward compat for n8n workflows) ──
+@app.get("/api/yao/dashboard")
+async def _yao_compat_dashboard():
+    return await alpha_factor_dashboard()
+
+@app.post("/api/yao/analyze")
+async def _yao_compat_analyze():
+    return await alpha_factor_analyze()
+
+@app.post("/api/yao/signals/refresh")
+async def _yao_compat_signals():
+    return await alpha_factor_signals()
+
+@app.post("/api/yao/iterate")
+async def _yao_compat_iterate(request: Request):
+    return await alpha_factor_iterate(request)
+
+@app.post("/api/n8n/trigger/yao_mine")
+async def _yao_compat_mine(request: Request):
+    return await n8n_trigger_alpha_mine(request)
 
 # ── Serve Frontend ───────────────────────────────────────
 
