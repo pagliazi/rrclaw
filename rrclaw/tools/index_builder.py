@@ -24,7 +24,7 @@ import yaml
 from rrclaw.tools.base import ToolSpec
 from rrclaw.tools.registry import GlobalToolRegistry, ToolIndex
 from rrclaw.tools.search import ToolSearchTool
-from rrclaw.tools.builtin.factor_tools import FactorMineTool, FactorEvaluateTool, FactorCombineTool, FactorListTool
+from rrclaw.tools.builtin.factor_tools import FactorMineTool, FactorEvaluateTool, FactorCombineTool, FactorListTool, StrategyBacktestTool
 from rrclaw.tools.pyagent.bridge import PyAgentBridge, PyAgentTool, PYAGENT_COMMANDS
 
 logger = logging.getLogger("rrclaw.tools.index_builder")
@@ -302,10 +302,11 @@ def build_tool_registry(
     registry.register_tier0(FactorEvaluateTool(bridge=bridge))
     registry.register_tier0(FactorCombineTool())
     registry.register_tier0(FactorListTool())
-    tier0_count += 4
+    registry.register_tier0(StrategyBacktestTool())
+    tier0_count += 5
     # strategy_backtest and factor_screen still go through PyAgent
     for qt in QUANT_TOOLS:
-        if qt["command"] in ("strategy_backtest", "factor_screen"):
+        if qt["command"] in ("factor_screen",):
             tool = PyAgentTool(
                 command=qt["command"], agent=qt["agent"], action=qt["action"],
                 description=qt["description"], timeout=qt.get("timeout", 30),

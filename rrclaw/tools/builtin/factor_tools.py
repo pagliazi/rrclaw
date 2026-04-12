@@ -191,3 +191,63 @@ class FactorListTool(Tool):
             return ToolResult.success("\n".join(lines))
         except Exception as e:
             return ToolResult.error(f"查询因子库失败: {e}")
+
+
+class StrategyBacktestTool(Tool):
+    """策略回测 — 直接调 ReachRich Bridge API，绕过 PyAgent"""
+
+    spec = ToolSpec(
+        name="strategy_backtest",
+        description="执行策略回测。输入策略代码和标的股票，返回收益曲线、夏普比率、最大回撤等指标。支持 backtrader 和 vectorbt 引擎。",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "code": {"type": "string", "description": "策略 Python 代码"},
+                "stock": {"type": "string", "default": "000001.SZ", "description": "回测标的代码"},
+                "start_date": {"type": "string", "default": "2025-01-01", "description": "起始日期"},
+                "end_date": {"type": "string", "default": "2026-01-01", "description": "结束日期"},
+                "mode": {"type": "string", "default": "vectorbt", "description": "引擎: backtrader/vectorbt"},
+            },
+            "required": ["code"],
+        },
+        is_tier0=True,
+        timeout=300,
+    )
+
+    async def call(self, input: dict[str, Any]) -> ToolResult:
+        import httpx
+
+        code = input.get("code", "")
+        if not code:
+            return ToolResult.error("请提供策略代码")
+
+        api_url = os.getenv("REACHRICH_URL", "http://192.168.1.138/api")
+        api_key = os.getenv("REACHRICH_TOKEN", "")
+
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        body = {
+            "strategy_code": code,
+            "stock": input.get("stock", "000001.SZ"),
+            "start_date": input.get("start_date", "2025-01-01"),
+            "end_date": input.get("end_date", "2026-01-01"),
+            "mode": input.get("mode", "vectorbt"),
+        }
+
+        try:
+            transport = httpx.AsyncHTTPTransport(proxy=None)
+            async with httpx.AsyncClient(timeout=300, transport=transport) as client:
+                resp = await client.post(
+                    f"{api_url}/bridge/backtest/run/",
+                    json=body,
+                    headers=headers,
+                )
+                if resp.status_code == 200:
+                    result = resp.json()
+                    return ToolResult.success(json.dumps(result, ensure_ascii=False, default=str))
+                else:
+                    return ToolResult.error(f"回测 API 返回 {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            return ToolResult.error(f"回测失败: {e}")
