@@ -1948,9 +1948,14 @@ async def api_apple_calendar_create(request: Request):
     return {"text": result}
 
 @app.get("/api/apple/reminders")
-async def api_apple_reminders(list_name: str = ""):
-    args = json.dumps({"list_name": list_name}) if list_name else ""
-    result = await send_to_orchestrator("remind_list", args)
+async def api_apple_reminders(request: Request):
+    """获取提醒事项 — 支持 filter 和 list 参数"""
+    filter_type = request.query_params.get("filter", "upcoming")
+    list_name = request.query_params.get("list", "")
+    params = {"filter": filter_type}
+    if list_name:
+        params["list_name"] = list_name
+    result = await send_to_orchestrator("remind_list", json.dumps(params))
     return {"text": result}
 
 @app.post("/api/apple/reminders")
@@ -1971,8 +1976,137 @@ async def api_apple_notify(request: Request):
     return {"text": result}
 
 @app.get("/api/apple/contacts")
-async def api_apple_contacts(q: str = ""):
-    result = await send_to_orchestrator("contact", q)
+async def api_apple_contacts(request: Request):
+    """通讯录搜索"""
+    kw = request.query_params.get("keyword", "")
+    result = await send_to_orchestrator("contact", kw)
+    return {"text": result}
+
+@app.put("/api/apple/reminders")
+async def api_apple_reminder_edit(request: Request):
+    """编辑提醒"""
+    body = await request.json()
+    result = await send_to_orchestrator("remind_edit", json.dumps(body))
+    return {"text": result}
+
+@app.delete("/api/apple/reminders")
+async def api_apple_reminder_delete(request: Request):
+    """删除提醒"""
+    body = await request.json()
+    result = await send_to_orchestrator("remind_del", json.dumps(body))
+    return {"text": result}
+
+@app.get("/api/apple/reminders/lists")
+async def api_apple_reminder_lists():
+    """获取提醒列表"""
+    result = await send_to_orchestrator("remind_lists", "")
+    return {"text": result}
+
+@app.get("/api/apple/notes")
+async def api_apple_notes(keyword: str = ""):
+    """搜索备忘录"""
+    result = await send_to_orchestrator("note_search", keyword)
+    return {"text": result}
+
+@app.post("/api/apple/notes")
+async def api_apple_note_create(request: Request):
+    """创建备忘录"""
+    body = await request.json()
+    result = await send_to_orchestrator("note", json.dumps(body))
+    return {"text": result}
+
+@app.post("/api/apple/music")
+async def api_apple_music(request: Request):
+    """Music 控制"""
+    body = await request.json()
+    result = await send_to_orchestrator("music", json.dumps(body))
+    return {"text": result}
+
+@app.get("/api/apple/music/status")
+async def api_apple_music_status():
+    """Music 状态"""
+    result = await send_to_orchestrator("music", json.dumps({"action": "status"}))
+    return {"text": result}
+
+@app.get("/api/apple/shortcuts")
+async def api_apple_shortcuts():
+    """快捷指令列表"""
+    result = await send_to_orchestrator("shortcut_list")
+    return {"text": result}
+
+@app.post("/api/apple/shortcuts/run")
+async def api_apple_shortcut_run(request: Request):
+    """运行快捷指令"""
+    body = await request.json()
+    result = await send_to_orchestrator("shortcut", json.dumps(body))
+    return {"text": result}
+
+@app.get("/api/apple/clipboard")
+async def api_apple_clipboard():
+    """读取剪贴板"""
+    result = await send_to_orchestrator("clip")
+    return {"text": result}
+
+@app.post("/api/apple/clipboard")
+async def api_apple_clipboard_write(request: Request):
+    """写入剪贴板"""
+    body = await request.json()
+    result = await send_to_orchestrator("clip_set", json.dumps(body))
+    return {"text": result}
+
+@app.post("/api/apple/finder")
+async def api_apple_finder(request: Request):
+    """Finder 打开路径"""
+    body = await request.json()
+    result = await send_to_orchestrator("finder", json.dumps(body))
+    return {"text": result}
+
+@app.post("/api/apple/alarm")
+async def api_apple_alarm_set(request: Request):
+    """设置闹钟"""
+    body = await request.json()
+    result = await send_to_orchestrator("alarm", json.dumps(body))
+    return {"text": result}
+
+@app.get("/api/apple/alarm/list")
+async def api_apple_alarm_list():
+    """列出闹钟"""
+    result = await send_to_orchestrator("alarm_list", "")
+    return {"text": result}
+
+@app.post("/api/apple/alarm/cancel")
+async def api_apple_alarm_cancel(request: Request):
+    """取消闹钟"""
+    body = await request.json()
+    result = await send_to_orchestrator("alarm_cancel", json.dumps(body))
+    return {"text": result}
+
+@app.post("/api/apple/timer")
+async def api_apple_timer(request: Request):
+    """设置定时器"""
+    body = await request.json()
+    result = await send_to_orchestrator("timer", json.dumps(body))
+    return {"text": result}
+
+@app.post("/api/apple/volume")
+async def api_apple_volume(request: Request):
+    """音量控制"""
+    body = await request.json()
+    result = await send_to_orchestrator("volume", json.dumps(body))
+    return {"text": result}
+
+@app.post("/api/apple/brightness")
+async def api_apple_brightness(request: Request):
+    """亮度控制"""
+    body = await request.json()
+    result = await send_to_orchestrator("brightness", json.dumps(body))
+    return {"text": result}
+
+@app.post("/api/apple/dnd")
+async def api_apple_dnd(request: Request):
+    """勿扰模式"""
+    body = await request.json()
+    result = await send_to_orchestrator("dnd", json.dumps(body))
     return {"text": result}
 
 
@@ -4050,6 +4184,640 @@ async def n8n_autoresearch_status(request: Request):
             result["log_tail"] = tail_out.stdout
 
     return result
+
+
+# ── Admin UID-Alias ───────────────────────────────────────
+
+@app.get("/api/admin/uid-alias")
+async def api_admin_list_uid_aliases(request: Request):
+    require_admin(request)
+    r = await get_redis()
+    raw = await r.hgetall("openclaw:uid_aliases")
+    aliases = {}
+    for k, v in raw.items():
+        key = k.decode() if isinstance(k, bytes) else k
+        val = v.decode() if isinstance(v, bytes) else v
+        aliases[key] = val
+    return {"aliases": aliases}
+
+@app.post("/api/admin/uid-alias")
+async def api_admin_uid_alias(request: Request):
+    """绑定 uid 别名，让多渠道（web/telegram）共享同一记忆。
+    body: {"aliases": ["web_admin", "tg_12345"], "canonical": "admin"}
+    """
+    require_admin(request)
+    body = await request.json()
+    aliases = body.get("aliases", [])
+    canonical = body.get("canonical", "")
+    if not canonical or not aliases:
+        raise HTTPException(400, "missing canonical or aliases")
+    r = await get_redis()
+    for alias in aliases:
+        await r.hset("openclaw:uid_aliases", alias, canonical)
+    await r.hset("openclaw:uid_aliases", canonical, canonical)
+    return {"ok": True, "msg": f"已绑定 {len(aliases)} 个别名 → {canonical}"}
+
+
+# ── DELETE /api/usage ─────────────────────────────────────
+
+@app.delete("/api/usage")
+async def api_usage_clear():
+    """清空 LLM 使用记录"""
+    r = await get_redis()
+    try:
+        from agents.llm_router import LLM_USAGE_KEY, LLM_USAGE_DAILY_PREFIX
+    except ImportError:
+        LLM_USAGE_KEY = "openclaw:llm_usage"
+        LLM_USAGE_DAILY_PREFIX = "openclaw:llm_usage_daily:"
+    await r.delete(LLM_USAGE_KEY)
+    keys = []
+    async for key in r.scan_iter(f"{LLM_USAGE_DAILY_PREFIX}*"):
+        keys.append(key)
+    if keys:
+        await r.delete(*keys)
+    return {"ok": True, "deleted_keys": len(keys) + 1}
+
+
+# ── Task Progress SSE ─────────────────────────────────────
+
+@app.get("/api/tasks/{task_id}/progress")
+async def api_task_progress(task_id: str):
+    """SSE 端点: 实时推送任务执行进度"""
+    async def _stream():
+        r = await get_redis()
+        pubsub = r.pubsub()
+        channel = f"openclaw:task_progress:{task_id}"
+        await pubsub.subscribe(channel)
+        try:
+            yield f"data: {json.dumps({'event': 'connected', 'task_id': task_id})}\n\n"
+            async for raw_msg in pubsub.listen():
+                if raw_msg["type"] != "message":
+                    continue
+                data = raw_msg["data"]
+                if isinstance(data, bytes):
+                    data = data.decode()
+                yield f"data: {data}\n\n"
+                try:
+                    parsed = json.loads(data)
+                    if parsed.get("status") in ("completed", "failed", "cancelled"):
+                        yield f"data: {json.dumps({'event': 'done'})}\n\n"
+                        break
+                except Exception:
+                    pass
+        finally:
+            await pubsub.unsubscribe(channel)
+            await pubsub.close()
+
+    return StreamingResponse(_stream(), media_type="text/event-stream")
+
+
+# ── Monitor HTML ──────────────────────────────────────────
+
+MONITOR_HTML_PATH = Path(BRAIN_PATH) / "usage_monitor.html"
+
+@app.get("/monitor", response_class=HTMLResponse)
+async def serve_monitor():
+    if MONITOR_HTML_PATH.exists():
+        return MONITOR_HTML_PATH.read_text(encoding="utf-8")
+    return "<h1>Monitor frontend not found</h1>"
+
+
+# ── Dev Host Test ─────────────────────────────────────────
+
+@app.post("/api/dev/host/test")
+async def api_dev_host_test(request: Request):
+    """测试主机连接"""
+    body = await request.json()
+    host = body.get("host", "")
+    if not host:
+        raise HTTPException(400, "missing host")
+    reply = await _send_and_wait("host_test", json.dumps({"host": host}), raw_reply=True)
+    raw = reply.get("raw", {}) if isinstance(reply, dict) else {}
+    text = reply.get("text", "") if isinstance(reply, dict) else str(reply)
+    return {
+        "result": raw.get("text") or text,
+        "connected": raw.get("connected", False),
+        "host": host,
+    }
+
+
+# ── Factor/Quant: Analyze, Exhaustive Combine, To-Strategy ─────
+
+@app.post("/api/digger/analyze")
+async def api_digger_analyze(request: Request):
+    """因子库健康分析: 过拟合检测 + 降维聚类 + 多样性报告"""
+    import sys, math
+    if BRAIN_PATH not in sys.path:
+        sys.path.insert(0, BRAIN_PATH)
+    from agents.factor_library import FactorLibrary
+    lib = FactorLibrary(redis_client=await get_redis())
+    all_factors = await lib.get_all_factors(status="active")
+
+    # Overfitting tiers
+    tier1, tier2, tier3, tier4 = [], [], [], []
+    for f in all_factors:
+        s, wr, dd, t = f.sharpe or 0, f.win_rate or 0, f.max_drawdown or 0, f.trades or 0
+        code = f.code or ""
+        cplx = "nested" if ("for i in range" in code and "for j in range" in code) else ("apply" if ".apply(" in code else "vectorized")
+        finfo = {"id": f.id, "theme": f.theme, "sub_theme": f.sub_theme, "sharpe": s, "ir": f.ir or 0, "ic_mean": f.ic_mean or 0, "win_rate": wr, "trades": t, "max_drawdown": dd, "complexity": cplx}
+        if s > 10 and wr >= 0.99 and dd <= 0.001:
+            tier1.append(finfo)
+        elif s > 10 or wr >= 0.95:
+            tier2.append(finfo)
+        elif 0.5 <= s <= 5 and wr < 0.7 and t > 500:
+            tier3.append(finfo)
+        else:
+            tier4.append(finfo)
+
+    # Theme distribution for T3
+    from collections import Counter
+    theme_dist = Counter(f["theme"] for f in tier3)
+
+    # Clustering T3
+    combinable = [f for f in tier3 if f["complexity"] != "nested"]
+    s_max = max((f["sharpe"] for f in combinable), default=1) or 1
+    ir_max = max((abs(f["ir"]) for f in combinable), default=1) or 1
+
+    def nvec(f):
+        return [f["sharpe"]/s_max, abs(f["ir"])/ir_max, f["win_rate"], f["trades"]/max(max((x["trades"] for x in combinable), default=1), 1)]
+
+    clusters = []
+    used = set()
+    for i, fi in enumerate(combinable):
+        if fi["id"] in used: continue
+        cl = [fi]
+        vi = nvec(fi)
+        for j, fj in enumerate(combinable):
+            if j <= i or fj["id"] in used: continue
+            vj = nvec(fj)
+            d = math.sqrt(sum((a-b)**2 for a,b in zip(vi, vj)))
+            if d < 0.05:
+                cl.append(fj); used.add(fj["id"])
+        used.add(fi["id"]); clusters.append(cl)
+
+    cluster_reps = []
+    for cl in sorted(clusters, key=lambda c: max(f["sharpe"] for f in c), reverse=True):
+        best = max(cl, key=lambda f: f["sharpe"])
+        cluster_reps.append({"representative": best, "size": len(cl)})
+
+    return {
+        "total_active": len(all_factors),
+        "tiers": {
+            "t1_extreme_overfit": {"count": len(tier1), "desc": "Sharpe>10 + WR=100% + DD=0", "factors": tier1[:10]},
+            "t2_suspect_overfit": {"count": len(tier2), "desc": "Sharpe>10 或 WR>95%", "factors": tier2[:10]},
+            "t3_normal": {"count": len(tier3), "desc": "Sharpe 0.5~5, WR<70%, Trades>500", "factors": tier3[:10]},
+            "t4_other": {"count": len(tier4), "desc": "其余", "factors": tier4[:10]},
+        },
+        "theme_distribution": dict(theme_dist.most_common(20)),
+        "clusters": {"total": len(clusters), "combinable_factors": len(combinable), "top_clusters": cluster_reps[:20]},
+    }
+
+
+@app.post("/api/digger/combine/exhaustive")
+async def api_digger_combine_exhaustive(request: Request):
+    """穷举组合: 对所有可融合因子做 C(n,k) 组合 → 逐个回测 → 返回最优组合。
+    body: {group_size: 2~5, max_combos: 100, skip_tested: true}
+    长耗时操作，通过 SSE 流式返回进度。"""
+    import sys
+    if BRAIN_PATH not in sys.path:
+        sys.path.insert(0, BRAIN_PATH)
+    from agents.factor_library import FactorLibrary
+    from agents.bridge_client import get_bridge_client
+    from datetime import date, timedelta
+    from itertools import combinations
+    import asyncio
+
+    body = await request.json()
+    group_size = min(max(body.get("group_size", 2), 2), 5)
+    max_combos = min(body.get("max_combos", 100), 500)
+    skip_tested = body.get("skip_tested", True)
+
+    lib = FactorLibrary(redis_client=await get_redis())
+    bridge = get_bridge_client()
+    candidates = await lib.get_combine_candidates()
+
+    if len(candidates) < group_size:
+        return {"ok": False, "error": f"可融合因子仅 {len(candidates)} 个，不足 {group_size}"}
+
+    # Get already-tested combos to skip
+    tested_sets = set()
+    if skip_tested:
+        history = await lib.get_combine_records(limit=500)
+        for rec in history:
+            ids = tuple(sorted(rec.get("input_factor_ids", [])))
+            tested_sets.add(ids)
+
+    all_combos = list(combinations(range(len(candidates)), group_size))
+    # Filter already tested
+    combos = []
+    for combo in all_combos:
+        ids = tuple(sorted(candidates[i].id for i in combo))
+        if ids not in tested_sets:
+            combos.append(combo)
+    combos = combos[:max_combos]
+
+    start_date = (date.today() - timedelta(days=180)).isoformat()
+    end_date = date.today().isoformat()
+
+    async def stream():
+        results = []
+        total = len(combos)
+        yield f"data: {json.dumps({'type':'start','total':total,'group_size':group_size,'candidates':len(candidates)})}\n\n"
+
+        for idx, combo in enumerate(combos):
+            factors = [candidates[i] for i in combo]
+            names = [f.sub_theme or f.theme for f in factors]
+            factor_ids = [f.id for f in factors]
+
+            # Build combined code
+            codes = []
+            for i, f in enumerate(factors):
+                renamed = f.code.replace("def generate_factor(", f"def _factor_{i+1}(")
+                codes.append(renamed)
+            combiner_lines = [
+                "\n\nimport numpy as np\nimport pandas as pd\n",
+                "def generate_factor(matrices):",
+                "    factors = []",
+            ]
+            for i in range(len(factors)):
+                combiner_lines.append(f"    try:\n        factors.append(_factor_{i+1}(matrices))\n    except Exception:\n        pass")
+            combiner_lines += [
+                "    if not factors:",
+                "        return pd.DataFrame(0, index=matrices['close'].index, columns=matrices['close'].columns)",
+                "    stacked = np.stack([f.values for f in factors], axis=0)",
+                "    combined = np.nanmean(stacked, axis=0)",
+                "    return pd.DataFrame(combined, index=matrices['close'].index, columns=matrices['close'].columns)",
+            ]
+            combined_code = "\n\n".join(codes) + "\n".join(combiner_lines)
+
+            yield f"data: {json.dumps({'type':'progress','idx':idx+1,'total':total,'names':names,'ids':factor_ids})}\n\n"
+
+            try:
+                resp = await bridge.run_factor_mining(
+                    factor_code=combined_code, start_date=start_date, end_date=end_date)
+                metrics = resp.get("metrics") or {} if resp.get("status") != "error" else {}
+                error = resp.get("error", "") if resp.get("status") == "error" else ""
+            except Exception as e:
+                metrics = {}
+                error = str(e)
+
+            input_info = [{"id": f.id, "theme": f.sub_theme or f.theme, "sharpe": f.sharpe, "ir": f.ir, "ic_mean": f.ic_mean} for f in factors]
+            evaluation = lib.evaluate_combine_quality(input_info, metrics)
+
+            record = {
+                "input_factors": input_info,
+                "input_factor_ids": factor_ids,
+                "combined_code_preview": combined_code[:1000],
+                "combined_metrics": metrics,
+                "evaluation": evaluation,
+                "verdict": evaluation["verdict"],
+                "status": "accepted" if evaluation["verdict"] == "accept" else "rejected" if evaluation["verdict"] == "reject" else "marginal",
+                "source": "exhaustive",
+            }
+            record_id = await lib.save_combine_record(record)
+
+            result = {
+                "idx": idx + 1, "names": names, "ids": factor_ids,
+                "metrics": metrics, "verdict": evaluation["verdict"], "record_id": record_id,
+                "error": error,
+            }
+            results.append(result)
+            yield f"data: {json.dumps({'type':'result', **result})}\n\n"
+
+            await asyncio.sleep(0.1)  # brief pause between combos
+
+        # Summary
+        accepted = [r for r in results if r["verdict"] == "accept"]
+        best = max(results, key=lambda r: (r.get("metrics") or {}).get("sharpe", 0)) if results else None
+        yield f"data: {json.dumps({'type':'done','tested':len(results),'accepted':len(accepted),'best':best})}\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@app.post("/api/digger/to-strategy")
+async def api_digger_to_strategy(request: Request):
+    """将因子策略化: factor → signals → run_alpha 回测 → 存入策略库"""
+    import sys
+    if BRAIN_PATH not in sys.path:
+        sys.path.insert(0, BRAIN_PATH)
+    body = await request.json()
+    factor_id = body.get("factor_id", "")
+    if not factor_id:
+        raise HTTPException(400, "factor_id required")
+
+    from agents.factor_library import FactorLibrary
+    from agents.bridge_client import get_bridge_client
+    from datetime import date, timedelta
+    lib = FactorLibrary(redis_client=await get_redis())
+    bridge = get_bridge_client()
+
+    all_factors = await lib.get_all_factors(status="")
+    factor = next((f for f in all_factors if f.id == factor_id), None)
+    if not factor:
+        raise HTTPException(404, f"factor {factor_id} not found")
+
+    entry_pct = body.get("entry_pct", 0.95)
+    exit_pct = body.get("exit_pct", 0.70)
+    strategy_code = factor.code + f"""
+
+def generate_signals(matrices):
+    \"\"\"基于因子排名的多空信号生成\"\"\"
+    factor = generate_factor(matrices)
+    close = matrices['close']
+    rank_pct = factor.rank(axis=1, pct=True)
+    factor_rising = factor > factor.shift(1)
+    entries = (rank_pct > {entry_pct}) & factor_rising
+    ma5 = close.rolling(5).mean()
+    exits = (rank_pct < {exit_pct}) | (close < ma5)
+    entries = entries.fillna(False)
+    exits = exits.fillna(False)
+    return entries, exits
+"""
+    start_date = (date.today() - timedelta(days=180)).isoformat()
+    end_date = date.today().isoformat()
+
+    try:
+        resp = await bridge.run_alpha(
+            alpha_code=strategy_code,
+            start_date=start_date,
+            end_date=end_date,
+            mode="technical",
+        )
+    except Exception as e:
+        return {"ok": False, "error": f"回测失败: {e}", "factor_id": factor_id}
+
+    metrics = resp.get("metrics", {})
+    status_str = resp.get("status", "error")
+    ok = status_str != "error"
+
+    # 存入策略库
+    strat_id = ""
+    if ok:
+        r = await get_redis()
+        strat_id = f"strat_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+        theme = factor.sub_theme or factor.theme
+        strat_record = {
+            "id": strat_id,
+            "title": f"[{theme}] Sharpe={factor.sharpe:.2f}",
+            "description": f"基于因子 {factor_id} ({theme}) 自动生成的策略",
+            "source": "factor",
+            "factor_id": factor_id,
+            "factor_theme": theme,
+            "factor_sharpe": factor.sharpe,
+            "code": strategy_code,
+            "metrics": metrics,
+            "params": {"entry_pct": entry_pct, "exit_pct": exit_pct},
+            "status": "draft",
+            "synced_to_139": False,
+            "created_at": time.time(),
+        }
+        await r.hset(STRATEGY_REDIS_KEY, strat_id, json.dumps(strat_record, ensure_ascii=False, default=str))
+
+    return {
+        "ok": ok,
+        "strategy_id": strat_id if ok else "",
+        "factor_id": factor_id,
+        "factor_theme": factor.sub_theme or factor.theme,
+        "factor_sharpe": factor.sharpe,
+        "strategy_code": strategy_code,
+        "strategy_metrics": metrics,
+        "error": resp.get("error", "") if not ok else "",
+        "params": {"entry_pct": entry_pct, "exit_pct": exit_pct},
+    }
+
+
+@app.post("/api/strategies/{strategy_id}/backtest")
+async def api_strategy_backtest(strategy_id: str, request: Request):
+    """对策略执行回测"""
+    import sys
+    if BRAIN_PATH not in sys.path:
+        sys.path.insert(0, BRAIN_PATH)
+    r = await get_redis()
+    raw = await r.hget(STRATEGY_REDIS_KEY, strategy_id)
+    if not raw:
+        raise HTTPException(404, "strategy not found")
+    strat = json.loads(raw)
+    code = strat.get("code", "")
+    if not code:
+        raise HTTPException(400, "strategy has no code")
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    from agents.bridge_client import get_bridge_client
+    from datetime import date, timedelta
+    bridge = get_bridge_client()
+    start_date = body.get("start_date", (date.today() - timedelta(days=180)).isoformat())
+    end_date = body.get("end_date", date.today().isoformat())
+
+    try:
+        resp = await bridge.run_alpha(
+            alpha_code=code,
+            start_date=start_date,
+            end_date=end_date,
+            mode="technical",
+        )
+    except Exception as e:
+        return {"ok": False, "error": f"回测失败: {e}"}
+
+    metrics = resp.get("metrics", {})
+    ok = resp.get("status", "error") != "error"
+
+    if ok:
+        strat["metrics"] = metrics
+        strat["last_backtest"] = time.time()
+        await r.hset(STRATEGY_REDIS_KEY, strategy_id, json.dumps(strat, ensure_ascii=False, default=str))
+
+    return {"ok": ok, "strategy_id": strategy_id, "metrics": metrics, "error": resp.get("error", "") if not ok else ""}
+
+
+@app.post("/api/strategies/{strategy_id}/screen")
+async def api_strategy_screen(strategy_id: str, request: Request):
+    """运行策略选股 — 返回最新交易日入场信号的股票"""
+    import sys
+    if BRAIN_PATH not in sys.path:
+        sys.path.insert(0, BRAIN_PATH)
+    r = await get_redis()
+    raw = await r.hget(STRATEGY_REDIS_KEY, strategy_id)
+    if not raw:
+        raise HTTPException(404, "strategy not found")
+    strat = json.loads(raw)
+    code = strat.get("code", "")
+    if not code:
+        raise HTTPException(400, "strategy has no code")
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    top_n = body.get("top_n", 50)
+
+    try:
+        from agents.bridge_client import get_bridge_client
+        bridge = get_bridge_client()
+        strat_name = strat.get("title") or strat.get("name") or strategy_id
+        factor_payload = {
+            "version": "1.0",
+            "execution_mode": "factor_code",
+            "meta": {
+                "name": strat_name,
+                "owner": "rrclaw-strategy",
+                "trade_date": "auto",
+            },
+            "universe": {"mode": "all", "exclude": ["*ST", "ST"]},
+            "timeframes": [{"id": "D1", "calendar": "trading", "lookback_bars": 60}],
+            "filters": {},
+            "outputs": {
+                "limit": top_n,
+                "fields": ["ts_code", "factor_score"],
+                "order_by": [{"factor": "factor_score", "direction": "desc"}],
+            },
+            "code": code,
+        }
+        resp = await bridge._post("/screener/", {
+            "payload": factor_payload,
+            "limit": top_n,
+        })
+        # Normalize screener response
+        if "results" in resp and "stocks" not in resp:
+            resp["stocks"] = resp.pop("results")
+        if "status" not in resp:
+            resp["status"] = "success" if resp.get("count", 0) >= 0 else "error"
+        if "signal_date" not in resp:
+            resp["signal_date"] = resp.get("trade_date", "")
+        return resp
+    except Exception as e:
+        return {"status": "error", "error": f"选股失败: {e}", "stocks": [], "count": 0}
+
+
+@app.post("/api/strategies/{strategy_id}/sync")
+async def api_strategy_sync(strategy_id: str):
+    """将策略代码同步部署到 192.168.1.139:/opt/quant_sandbox/strategies/"""
+    import sys
+    if BRAIN_PATH not in sys.path:
+        sys.path.insert(0, BRAIN_PATH)
+    r = await get_redis()
+    raw = await r.hget(STRATEGY_REDIS_KEY, strategy_id)
+    if not raw:
+        raise HTTPException(404, "strategy not found")
+    strat = json.loads(raw)
+    code = strat.get("code", "")
+    if not code:
+        raise HTTPException(400, "strategy has no code")
+
+    filename = f"{strategy_id}.py"
+    remote_path = f"/opt/quant_sandbox/strategies/{filename}"
+
+    # 头部注释
+    header = f'''"""
+OpenClaw 自动生成策略
+ID: {strategy_id}
+来源: {strat.get("source", "factor")}
+因子: {strat.get("factor_id", "N/A")}
+主题: {strat.get("factor_theme", "")}
+生成时间: {time.strftime("%Y-%m-%d %H:%M:%S")}
+"""
+'''
+    full_code = header + code
+
+    from agents.bridge_client import get_bridge_client
+    bridge = get_bridge_client()
+    errors = []
+
+    # 1) 写文件到沙箱目录
+    try:
+        resp = await bridge._post("/strategy/deploy/", {
+            "strategy_id": strategy_id,
+            "code": full_code,
+            "filename": filename,
+        })
+        if not resp.get("ok"):
+            errors.append(f"文件部署失败: {resp.get('detail', resp)}")
+        else:
+            remote_path = resp.get("path", remote_path)
+    except Exception as e:
+        errors.append(f"文件部署异常: {e}")
+
+    # 2) 写入 ReachRich 数据库 (stocks_aistrategyledger) 让前端可见
+    ledger_id = None
+    try:
+        theme = strat.get("factor_theme", "")
+        metrics = strat.get("metrics", {})
+        save_resp = await bridge._post("/strategy/save/", {
+            "title": strat.get("title", f"[OpenClaw] {theme}"),
+            "topic": f"factor:{strat.get('factor_id', '')} | {theme}",
+            "status": "APPROVE",
+            "attempts": 1,
+            "strategy_code": full_code,
+            "backtest_metrics": metrics if isinstance(metrics, dict) else {},
+            "risk_review": f"Sharpe={metrics.get('sharpe_ratio', 0):.2f}, MaxDD={metrics.get('max_drawdown_pct', 0):.1f}%",
+            "decision_report": f"因子 {strat.get('factor_id','')} ({theme}) 自动策略化, Sharpe={strat.get('factor_sharpe', 0):.2f}",
+            "rounds_data": [],
+            "model_used": "openclaw-factor-pipeline",
+        })
+        ledger_id = save_resp.get("id")
+    except Exception as e:
+        errors.append(f"数据库写入异常: {e}")
+
+    if errors and not ledger_id:
+        return {"ok": False, "error": "; ".join(errors)}
+
+    # 3) 注册到 screener presets (stocks_strategypreset) 让 ReachRich 选股器可调用
+    preset_slug = None
+    if ledger_id:
+        try:
+            slug = f"factor-{strategy_id.replace('strat_', '')}"
+            theme = strat.get("factor_theme", "")
+            preset_payload = {
+                "version": "1.0",
+                "execution_mode": "factor_code",
+                "meta": {
+                    "name": strat.get("title", f"[因子] {theme}"),
+                    "owner": "openclaw",
+                    "trade_date": "auto",
+                },
+                "universe": {"mode": "all", "exclude": ["*ST", "ST"]},
+                "timeframes": [{"id": "D1", "calendar": "trading", "lookback_bars": 60}],
+                "filters": {},
+                "outputs": {
+                    "limit": 50,
+                    "fields": ["ts_code", "factor_score"],
+                    "order_by": [{"factor": "factor_score", "direction": "desc"}],
+                },
+                "code": code,
+                "backtest_metrics": strat.get("metrics", {}),
+            }
+            preset_resp = await bridge._post("/strategy/register-preset/", {
+                "slug": slug,
+                "name": strat.get("title", f"[因子] {theme}"),
+                "description": f"因子策略选股: {theme} (Sharpe={strat.get('factor_sharpe', 0):.2f})",
+                "category": "factor",
+                "payload": preset_payload,
+                "ledger_id": ledger_id,
+            })
+            preset_slug = preset_resp.get("slug", slug)
+        except Exception as e:
+            errors.append(f"Screener preset注册: {e}")
+
+    # 更新状态
+    strat["synced_to_139"] = True
+    strat["sync_time"] = time.time()
+    strat["remote_path"] = remote_path
+    strat["status"] = "deployed"
+    if ledger_id:
+        strat["ledger_id"] = ledger_id
+    if preset_slug:
+        strat["preset_slug"] = preset_slug
+    await r.hset(STRATEGY_REDIS_KEY, strategy_id, json.dumps(strat, ensure_ascii=False, default=str))
+
+    return {
+        "ok": True, "strategy_id": strategy_id,
+        "remote_path": remote_path, "filename": filename,
+        "ledger_id": ledger_id,
+        "preset_slug": preset_slug,
+        "warnings": errors if errors else None,
+    }
 
 
 # ── Serve Frontend ───────────────────────────────────────
