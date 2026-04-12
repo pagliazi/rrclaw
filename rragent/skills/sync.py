@@ -3,7 +3,7 @@ Skill Sync — bidirectional skill synchronization.
 
 Syncs skills between:
 - RRAgent local (~/.rragent/skills/)
-- OpenClaw workspace (~/.rragent/workspace/skills/)
+- RRAgent workspace (~/.rragent/workspace/skills/)
 - Hermes skills store (if available)
 
 Ensures auto-created skills are available across all systems.
@@ -25,7 +25,7 @@ class SkillSync:
 
     Strategy:
     - Source of truth: ~/.rragent/skills/ (RRAgent creates skills here)
-    - Mirrors: OpenClaw workspace, Hermes store
+    - Mirrors: RRAgent workspace, Hermes store
     - Sync direction: RRAgent -> mirrors (one-way for auto-created)
     - Manual skills from mirrors are imported on demand
 
@@ -35,13 +35,11 @@ class SkillSync:
     def __init__(
         self,
         rragent_dir: str | Path | None = None,
-        openclaw_dir: str | Path | None = None,
         hermes_dir: str | Path | None = None,
     ):
-        self.rragent_dir = Path(rragent_dir) if rragent_dir else Path.home() / ".rragent" / "skills"
-        self.openclaw_dir = (
-            Path(openclaw_dir) if openclaw_dir
-            else Path.home() / ".openclaw" / "workspace" / "skills"
+        self.rragent_dir = (
+            Path(rragent_dir) if rragent_dir
+            else Path.home() / ".rragent" / "skills"
         )
         self.hermes_dir = (
             Path(hermes_dir) if hermes_dir
@@ -54,16 +52,16 @@ class SkillSync:
     async def sync_all(self):
         """Sync skills to all mirrors."""
         synced = 0
-        synced += self._sync_to_dir(self.openclaw_dir)
+        synced += self._sync_to_dir(self.rragent_dir)
         synced += self._sync_to_dir(self.hermes_dir)
 
         if synced > 0:
             logger.info(f"Synced {synced} skill files to mirrors")
         return synced
 
-    async def import_from_openclaw(self):
-        """Import new skills from OpenClaw workspace."""
-        return self._import_from_dir(self.openclaw_dir)
+    async def import_from_legacy(self):
+        """Import new skills from RRAgent workspace."""
+        return self._import_from_dir(self.rragent_dir)
 
     async def import_from_hermes(self):
         """Import new skills from Hermes store."""
@@ -119,7 +117,7 @@ class SkillSync:
         result = {}
         for name, path in [
             ("rragent", self.rragent_dir),
-            ("openclaw", self.openclaw_dir),
+            ("rragent", self.rragent_dir),
             ("hermes", self.hermes_dir),
         ]:
             if path.exists():

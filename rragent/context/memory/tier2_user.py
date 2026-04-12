@@ -64,10 +64,10 @@ class UserMemory:
         if workspace_dir:
             self._dir = Path(workspace_dir)
         else:
-            # Try OpenClaw workspace first, then RRAgent
-            openclaw_ws = Path.home() / ".openclaw" / "workspace"
-            if openclaw_ws.exists():
-                self._dir = openclaw_ws
+            # Try RRAgent workspace first, then RRAgent
+            rragent_ws = Path.home() / ".rragent" / "workspace"
+            if rragent_ws.exists():
+                self._dir = rragent_ws
             else:
                 self._dir = Path.home() / ".rragent"
 

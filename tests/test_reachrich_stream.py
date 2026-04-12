@@ -292,7 +292,7 @@ def test_config_env_overrides():
 
     os.environ["REACHRICH_URL"] = "http://192.168.1.100:8001/api/bridge"
     os.environ["REACHRICH_TOKEN"] = "42:abc123def456"
-    os.environ["BRIDGE_CLIENT_PATH"] = "/opt/openclaw/agents"
+    os.environ["BRIDGE_CLIENT_PATH"] = "/opt/rragent/agents"
 
     try:
         from rragent.runtime.config import load_config
@@ -301,7 +301,7 @@ def test_config_env_overrides():
         assert cfg["reachrich"]["base_url"] == "http://192.168.1.100:8001/api/bridge"
         assert cfg["reachrich"]["token"] == "42:abc123def456"
         assert "secret" not in cfg["reachrich"], "secret should be removed from config"
-        assert cfg["reachrich"]["bridge_client_path"] == "/opt/openclaw/agents"
+        assert cfg["reachrich"]["bridge_client_path"] == "/opt/rragent/agents"
         assert cfg["reachrich"]["stream_verify_hmac"] is True
     finally:
         del os.environ["REACHRICH_URL"]

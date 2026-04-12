@@ -1,7 +1,7 @@
 """
 ACP Runtime — Agent Communication Protocol external runtime.
 
-Implements the OpenClaw ACP protocol so RRAgent can fully take over
+Implements the RRAgent ACP protocol so RRAgent can fully take over
 the agent loop from the Gateway's embedded Pi runtime.
 
 Gateway → ACP WebSocket → RRAgent ConversationRuntime
@@ -29,13 +29,13 @@ logger = logging.getLogger("rragent.channels.acp_runtime")
 
 class ACPRuntime:
     """
-    ACP (Agent Communication Protocol) external runtime for OpenClaw.
+    ACP (Agent Communication Protocol) external runtime for RRAgent.
 
     Runs a WebSocket server that Gateway connects to.
     Receives user messages, runs them through ConversationRuntime,
     and streams responses back via ACP protocol.
 
-    Config in openclaw.json:
+    Config in rragent.json:
     {
       "agents": [{
         "id": "rragent",

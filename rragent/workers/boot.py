@@ -295,7 +295,7 @@ class HermesWorker(Worker):
 
 
 class GatewayWorker(Worker):
-    """Worker for OpenClaw Gateway connectivity."""
+    """Worker for IM Gateway connectivity."""
 
     def __init__(self, gateway_url: str = "ws://127.0.0.1:18789"):
         super().__init__("gateway", required=True)

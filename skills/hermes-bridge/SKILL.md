@@ -3,7 +3,7 @@ name: hermes-bridge
 description: Delegate complex tasks to Hermes Agent — web search, code execution, browser automation, file operations, and 118 built-in skills
 version: 1.0.0
 metadata:
-  openclaw:
+  rragent:
     requires:
       env: ["REDIS_URL"]
       bins: ["python3", "redis-cli"]
@@ -14,7 +14,7 @@ metadata:
 
 # Hermes Agent Bridge
 
-Delegate tasks to Hermes Agent when you need capabilities beyond OpenClaw's native toolset.
+Delegate tasks to Hermes Agent when you need capabilities beyond RRAgent's native toolset.
 
 ## When to Use
 
@@ -29,7 +29,7 @@ Delegate tasks to Hermes Agent when you need capabilities beyond OpenClaw's nati
 
 ## How It Works
 
-The bridge uses Redis Pub/Sub to communicate with Hermes. Messages are sent to `bridge:openclaw→hermes` and replies come back on a dedicated per-message channel.
+The bridge uses Redis Pub/Sub to communicate with Hermes. Messages are sent to `bridge:rragent→hermes` and replies come back on a dedicated per-message channel.
 
 ## Procedure
 
@@ -92,7 +92,7 @@ The bridge uses Redis Pub/Sub to communicate with Hermes. Messages are sent to `
 - Hermes tasks may take up to 5 minutes for complex multi-step workflows
 - PTC (code execution) requires a sandbox environment to be configured
 - Browser automation requires Chrome/Chromium installed on the Hermes host
-- Skills learned by Hermes persist on the Hermes side — use skill sync to share with OpenClaw
+- Skills learned by Hermes persist on the Hermes side — use skill sync to share with RRAgent
 
 ## Verification
 

@@ -43,7 +43,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 # ── Config ───────────────────────────────────────────────
 
 server_start_time = time.time()
-BRAIN_PATH = os.getenv("BRAIN_PATH", os.path.expanduser("~/OpenClaw-Universe/openclaw-brain"))
+BRAIN_PATH = os.getenv("BRAIN_PATH", os.path.expanduser("~/RRAgent-Universe/rragent-brain"))
 REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 PORT = int(os.getenv("RRAGENT_PORT", "7789"))
 HOST = os.getenv("RRAGENT_HOST", "0.0.0.0")
@@ -51,7 +51,7 @@ JWT_SECRET = os.getenv("JWT_SECRET", "rragent-secret")
 JWT_EXPIRE = int(os.getenv("JWT_EXPIRE", "86400"))
 AUTH_USER = os.getenv("WEBCHAT_AUTH_USER", "")
 AUTH_PASS = os.getenv("WEBCHAT_AUTH_PASS", "")
-N8N_SERVICE_TOKEN = os.getenv("N8N_SERVICE_TOKEN", "openclaw-n8n-2026")
+N8N_SERVICE_TOKEN = os.getenv("N8N_SERVICE_TOKEN", "rragent-n8n-2026")
 SKILLS_DIR = os.getenv(
     "OPENCLAW_SKILLS_DIR",
     os.path.join(BRAIN_PATH, "agents/skills"),
@@ -2302,7 +2302,7 @@ async def n8n_trigger_mine(request: Request):
 async def meme_dashboard():
     """短线Meme Stock 因子库全貌: 主题统计 / TOP 因子 / 最新信号 / 迭代日志。"""
     _ensure_brain_path()
-    from agents.yao_optimizer import analyze_library, REDIS_KEY_DASH_CACHE  # brain module
+    from agents.meme_optimizer import analyze_library, REDIS_KEY_DASH_CACHE  # brain module
     r = await get_redis()
 
     # 优先返回缓存
@@ -2322,7 +2322,7 @@ async def meme_dashboard():
 async def meme_analyze():
     """运行一次完整的Meme Stock 因子库分析 + 主题权重更新 (n8n 调用)。"""
     _ensure_brain_path()
-    from agents.yao_optimizer import run_analysis_and_update
+    from agents.meme_optimizer import run_analysis_and_update
     from agents.factor_library import get_factor_library
     r = await get_redis()
     fl = get_factor_library()
@@ -2334,7 +2334,7 @@ async def meme_analyze():
 async def meme_signals_refresh(request: Request):
     """用 TOP Meme 因子跑实盘截面筛选，刷新信号缓存 (n8n 调用)。"""
     _ensure_brain_path()
-    from agents.yao_optimizer import refresh_signals
+    from agents.meme_optimizer import refresh_signals
     from agents.factor_library import get_factor_library
     from agents.bridge_client import get_bridge_client
     body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
@@ -2350,20 +2350,20 @@ async def meme_signals_refresh(request: Request):
 async def meme_iterate(request: Request):
     """根据当前主题权重触发一次针对性迭代挖掘 (前端手动触发 / n8n 调用)。"""
     _ensure_brain_path()
-    from agents.yao_optimizer import get_focus_theme_for_next_session
+    from agents.meme_optimizer import get_focus_theme_for_next_session
     r = await get_redis()
     locked = await r.set(_MEME_SESSION_LOCK_KEY, "1", nx=True, ex=_YAO_SESSION_LOCK_TTL)
     if not locked:
         return {"ok": False, "skipped": True, "message": "Meme Stock挖掘仍在进行中"}
 
     focus = await get_focus_theme_for_next_session(r)
-    from agents.yao_digger import run_yao_session, THEME_NAMES
+    from agents.meme_digger import run_meme_session, THEME_NAMES
 
     async def _run():
         try:
-            result = await run_yao_session(max_rounds=2, factors_per_round=5, focus_theme_id=focus)
+            result = await run_meme_session(max_rounds=2, factors_per_round=5, focus_theme_id=focus)
             r2 = await get_redis()
-            from agents.yao_optimizer import run_analysis_and_update, log_iteration_event
+            from agents.meme_optimizer import run_analysis_and_update, log_iteration_event
             from agents.factor_library import get_factor_library
             fl = get_factor_library()
             await run_analysis_and_update(fl, r2)
@@ -2384,7 +2384,7 @@ async def meme_iterate(request: Request):
             await r3.delete(_MEME_SESSION_LOCK_KEY)
 
     asyncio.create_task(_run())
-    from agents.yao_optimizer import THEME_NAMES
+    from agents.meme_optimizer import THEME_NAMES
     theme_label = THEME_NAMES.get(focus, focus) if focus else "全主题随机"
     return {"ok": True, "focus_theme": focus, "focus_theme_name": theme_label,
             "message": f"迭代挖掘已启动 → 重点主题: {theme_label}"}
@@ -2419,11 +2419,11 @@ async def n8n_trigger_meme_mine(request: Request):
                 "message": "Meme Stock挖掘上一轮仍在运行，跳过（防止 139 内存溢出）"}
 
     _ensure_brain_path()
-    from agents.yao_digger import run_yao_session
+    from agents.meme_digger import run_meme_session
 
     async def _run():
         try:
-            result = await run_yao_session(
+            result = await run_meme_session(
                 max_rounds=rounds,
                 factors_per_round=factors,
                 focus_theme_id=focus_theme,
@@ -2952,7 +2952,7 @@ async def _call_orchestrator_skill(r, action: str, params: dict = None, timeout:
     return {"error": f"orchestrator {action} 超时 ({timeout}s)"}
 
 
-_EVOLVER_DIR = "/Users/clawagent/.openclaw/workspace/skills/capability-evolver"
+_EVOLVER_DIR = "/Users/clawagent/.rragent/workspace/skills/capability-evolver"
 
 
 async def _run_evolver_op(op_script: str, timeout: int = 30) -> dict:
@@ -3673,7 +3673,7 @@ def generate_factor(matrices):
             "execution_mode": "factor_code",
             "meta": {
                 "name": group_name,
-                "owner": "openclaw-high-pool",
+                "owner": "rragent-high-pool",
                 "trade_date": "auto",
                 "pool": "high_pool",
                 "rank": rank,
@@ -4017,7 +4017,7 @@ def generate_signals(matrices):
 
 # ── autoresearch-mlx ───────────────────────────────────
 
-_AUTORESEARCH_DIR = "/Users/zayl/OpenClaw-Universe/autoresearch-mlx"
+_AUTORESEARCH_DIR = "/Users/zayl/RRAgent-Universe/autoresearch-mlx"
 _AUTORESEARCH_RUNNING: dict = {}  # track running experiment
 
 
@@ -4711,7 +4711,7 @@ async def api_strategy_sync(strategy_id: str):
 
     # 头部注释
     header = f'''"""
-OpenClaw 自动生成策略
+RRAgent 自动生成策略
 ID: {strategy_id}
 来源: {strat.get("source", "factor")}
 因子: {strat.get("factor_id", "N/A")}
@@ -4745,7 +4745,7 @@ ID: {strategy_id}
         theme = strat.get("factor_theme", "")
         metrics = strat.get("metrics", {})
         save_resp = await bridge._post("/strategy/save/", {
-            "title": strat.get("title", f"[OpenClaw] {theme}"),
+            "title": strat.get("title", f"[RRAgent] {theme}"),
             "topic": f"factor:{strat.get('factor_id', '')} | {theme}",
             "status": "APPROVE",
             "attempts": 1,
@@ -4754,7 +4754,7 @@ ID: {strategy_id}
             "risk_review": f"Sharpe={metrics.get('sharpe_ratio', 0):.2f}, MaxDD={metrics.get('max_drawdown_pct', 0):.1f}%",
             "decision_report": f"因子 {strat.get('factor_id','')} ({theme}) 自动策略化, Sharpe={strat.get('factor_sharpe', 0):.2f}",
             "rounds_data": [],
-            "model_used": "openclaw-factor-pipeline",
+            "model_used": "rragent-factor-pipeline",
         })
         ledger_id = save_resp.get("id")
     except Exception as e:
@@ -4774,7 +4774,7 @@ ID: {strategy_id}
                 "execution_mode": "factor_code",
                 "meta": {
                     "name": strat.get("title", f"[因子] {theme}"),
-                    "owner": "openclaw",
+                    "owner": "rragent",
                     "trade_date": "auto",
                 },
                 "universe": {"mode": "all", "exclude": ["*ST", "ST"]},

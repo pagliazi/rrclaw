@@ -12,8 +12,8 @@ import sys
 import time
 from typing import Any
 
-# Add openclaw-brain to path for alpha_digger import
-BRAIN_PATH = os.getenv("BRAIN_PATH", "/Users/zayl/OpenClaw-Universe/openclaw-brain")
+# Add rragent-brain to path for alpha_digger import
+BRAIN_PATH = os.getenv("BRAIN_PATH", "/Users/zayl/rragent-brain")
 if BRAIN_PATH not in sys.path:
     sys.path.insert(0, BRAIN_PATH)
 

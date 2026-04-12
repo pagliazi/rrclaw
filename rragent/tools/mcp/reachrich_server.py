@@ -36,7 +36,7 @@ class ReachRichMCPServer:
 
     Wraps BridgeClient HTTP+HMAC calls for fast market queries.
     All method signatures and parameter names match the actual
-    BridgeClient API (openclaw-brain/agents/bridge_client.py).
+    BridgeClient API (rragent-brain/agents/bridge_client.py).
 
     NOT exposed (too slow for MCP):
     - backtest (up to 300s)

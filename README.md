@@ -62,7 +62,7 @@ python -m rragent --config rragent.yaml
 ## Architecture
 
 ```
-┌─ OpenClaw Gateway ──────────────────────────────────┐
+┌─ IM Gateway ──────────────────────────────────┐
 │  Telegram · WebChat · 飞书 · API                     │
 └──────────────┬──────────────────────────────────────┘
                │ WebSocket / ACP
@@ -159,6 +159,6 @@ MIT. See [LICENSE](LICENSE).
 
 <div align="center">
 
-Based on [Claude Code](https://github.com/anthropics/claude-code) · [Hermes Agent](https://github.com/NousResearch/hermes-agent) · [OpenClaw](https://github.com/openclaw/openclaw)
+Based on [Claude Code](https://github.com/anthropics/claude-code) · [Hermes Agent](https://github.com/NousResearch/hermes-agent) · [RRAgent](https://github.com/openclaw/openclaw)
 
 </div>

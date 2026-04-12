@@ -85,7 +85,7 @@ class SkillLoader:
         if workspace_dir:
             self._dirs.append(Path(workspace_dir))
         else:
-            ws = Path.home() / ".openclaw" / "workspace" / "skills"
+            ws = Path.home() / ".rragent" / "workspace" / "skills"
             if ws.exists():
                 self._dirs.append(ws)
 

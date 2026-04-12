@@ -140,13 +140,13 @@ def create_test_server():
 
 
 # ══════════════════════════════════════════════════════════════
-# Test 1: IM Channel (Mock OpenClaw Gateway → GatewayChannel)
+# Test 1: IM Channel (Mock IM Gateway → GatewayChannel)
 # ══════════════════════════════════════════════════════════════
 
 async def test_im_gateway():
     """
     Simulate Telegram message flow:
-    User (Telegram) → OpenClaw Gateway → RRAgent GatewayChannel → ConversationRuntime → response
+    User (Telegram) → IM Gateway → RRAgent GatewayChannel → ConversationRuntime → response
 
     We create a mock Gateway WS server, then connect RRAgent's GatewayChannel to it.
     """
@@ -158,9 +158,9 @@ async def test_im_gateway():
     test_done = asyncio.Event()
     gateway_port = 19789
 
-    # ── Mock OpenClaw Gateway WS Server ──
+    # ── Mock IM Gateway WS Server ──
     async def mock_gateway_handler(ws, path=""):
-        """Simulate OpenClaw Gateway behavior."""
+        """Simulate IM Gateway behavior."""
         # 1. Expect channel.register from RRAgent
         raw = await asyncio.wait_for(ws.recv(), timeout=5)
         reg = json.loads(raw)

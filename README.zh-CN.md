@@ -60,7 +60,7 @@ python -m rragent --config rragent.yaml
 ## 系统架构
 
 ```
-┌─ OpenClaw 网关 ─────────────────────────────────────┐
+┌─ IM 网关 ─────────────────────────────────────┐
 │  Telegram · WebChat · 飞书 · API                     │
 └──────────────┬──────────────────────────────────────┘
                │ WebSocket / ACP
@@ -159,6 +159,6 @@ MIT. 详见 [LICENSE](LICENSE).
 
 <div align="center">
 
-基于 [Claude Code](https://github.com/anthropics/claude-code) · [Hermes Agent](https://github.com/NousResearch/hermes-agent) · [OpenClaw](https://github.com/openclaw/openclaw)
+基于 [Claude Code](https://github.com/anthropics/claude-code) · [Hermes Agent](https://github.com/NousResearch/hermes-agent) · [RRAgent](https://github.com/openclaw/openclaw)
 
 </div>

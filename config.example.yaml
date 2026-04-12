@@ -2,7 +2,7 @@
 # Copy to rragent.yaml and customize for your environment.
 # Environment variables override YAML values (see README).
 
-# ── OpenClaw Gateway ──
+# ── RRAgent Gateway ──
 gateway:
   # Gateway WebSocket URL
   # Override: GATEWAY_URL
@@ -75,7 +75,7 @@ resilience:
 
 # ── Skills ──
 skills:
-  # Auto-sync skills between RRAgent, OpenClaw, Hermes
+  # Auto-sync skills between RRAgent, RRAgent, Hermes
   auto_sync: true
 
   # Sync interval in hours

@@ -1,5 +1,5 @@
 """
-OpenClaw Gateway Channel — WebSocket connection using v3 protocol.
+IM Gateway Channel — WebSocket connection using v3 protocol.
 
 Refactored from bridge/gateway_client.py to work with ConversationRuntime.
 Gateway is now a pure channel layer; RRAgent controls the LLM loop.
@@ -26,7 +26,7 @@ logger = logging.getLogger("rragent.channels.gateway")
 
 class GatewayChannel:
     """
-    WebSocket client for OpenClaw Gateway (v3 protocol).
+    WebSocket client for IM Gateway (v3 protocol).
 
     In the new architecture, Gateway only routes messages.
     RRAgent's ConversationRuntime handles all agent logic.
@@ -255,7 +255,7 @@ class GatewayChannel:
         })
 
     async def canvas_present(self, session_id: str, html: str, title: str = ""):
-        """Render HTML on OpenClaw Canvas."""
+        """Render HTML on Canvas."""
         await self._connected.wait()
         await self._send({
             "type": "event",

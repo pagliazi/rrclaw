@@ -4,7 +4,7 @@ RRAgent Server — Main entry point.
 Orchestrates all harness components:
 1. Loads configuration
 2. Connects to Redis (PyAgent bridge)
-3. Connects to OpenClaw Gateway
+3. Connects to IM Gateway
 4. Initializes tool registry
 5. Runs ConversationRuntime for each incoming message
 """

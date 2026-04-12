@@ -21,11 +21,11 @@ services:
       - redis
     restart: unless-stopped
 
-  # ── 可选：OpenClaw Gateway（接入 Telegram/飞书/WebChat 时需要）──
+  # ── 可选：IM Gateway（接入 Telegram/飞书/WebChat 时需要）──
   # 取消注释以启用 IM 通道
   #
-  # openclaw:
-  #   image: ghcr.io/openclaw/openclaw:latest
+  # rragent:
+  #   image: ghcr.io/rragent/rragent:latest
   #   ports:
   #     - "18789:18789"
   #   environment:

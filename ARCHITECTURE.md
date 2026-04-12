@@ -8,8 +8,6 @@
 ├── rragent_server.py               # 统一 FastAPI 服务入口
 ├── static/                         # 前端 (React JSX + Tailwind)
 ├── deploy/                         # 部署配置
-├── bridge/                         # [遗留] hermes-openclaw-bridge 旧代码
-├── toolsets/                       # [遗留] OpenClaw toolset
 ├── config.example.yaml             # 配置模板
 ├── .env.example                    # 环境变量模板
 ├── deploy.sh                       # 一键部署脚本
@@ -97,7 +95,7 @@ rragent/
 │   └── task_packet.py              # 优先级任务队列
 │
 ├── channels/                       # 通道接入
-│   ├── gateway.py                  # OpenClaw Gateway WebSocket (v3)
+│   ├── gateway.py                  # Gateway WebSocket (v3 protocol)
 │   ├── acp_runtime.py              # ACP WebSocket Server (:7790)
 │   └── webhook.py                  # HTTP 回调
 │
@@ -144,7 +142,7 @@ static/
 | `OPENAI_API_KEY` | — | LLM API 密钥 (百炼/OpenAI 兼容) |
 | `OPENAI_BASE_URL` | `https://coding.dashscope.aliyuncs.com/v1` | LLM API 地址 |
 | `REDIS_URL` | `redis://127.0.0.1:6379/0` | Redis 连接 |
-| `BRAIN_PATH` | `~/OpenClaw-Universe/openclaw-brain` | openclaw-brain 源码路径 |
+| `BRAIN_PATH` | `~/RRAgent-Universe/rragent-brain` | rragent-brain 源码路径 |
 | `REACHRICH_URL` | `http://192.168.1.138/api` | ReachRich API 地址 |
 | `REACHRICH_TOKEN` | — | ReachRich API Key (`rk_...`) |
 | `JWT_SECRET` | `rragent-secret` | JWT 签名密钥 |

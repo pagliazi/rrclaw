@@ -1,5 +1,5 @@
 """
-Canvas Tool — render interactive visualizations via OpenClaw Canvas/A2UI.
+Canvas Tool — render interactive visualizations via Canvas/A2UI.
 
 Sends HTML/chart data to Gateway for rendering in WebChat or other frontends.
 Supports:
@@ -25,7 +25,7 @@ logger = logging.getLogger("rragent.tools.builtin.canvas")
 
 class CanvasTool(Tool):
     """
-    Render visualizations through OpenClaw Canvas.
+    Render visualizations through Canvas.
 
     The tool generates HTML/JS chart code and sends it to the
     Gateway for rendering. Supports multiple chart types.

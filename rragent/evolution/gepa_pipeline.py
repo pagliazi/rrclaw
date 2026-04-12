@@ -460,7 +460,7 @@ Rules:
         """Load current SOUL.md content."""
         for path in [
             self.SOUL_PATH,
-            Path.home() / ".openclaw" / "workspace" / "SOUL.md",
+            Path.home() / ".rragent" / "workspace" / "SOUL.md",
         ]:
             if path.exists():
                 return path.read_text(encoding="utf-8")

@@ -1,7 +1,7 @@
 """
 Webhook Handler — receive and send webhooks for lifecycle events.
 
-Integrates with OpenClaw hook system:
+Integrates with RRAgent hook system:
 - Receives evolution notifications
 - Sends alerts to external systems
 - Gateway hook mappings support

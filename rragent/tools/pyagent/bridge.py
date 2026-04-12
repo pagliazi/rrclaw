@@ -27,9 +27,9 @@ class PyAgentBridge:
     """
     Manages Redis connections to the 12 Python agents.
 
-    Message protocol matches AgentMessage from openclaw/agents/base.py:
-    - Publish to `openclaw:{agent}` channel
-    - Wait for response on `openclaw:{agent}` with matching reply_to
+    Message protocol matches AgentMessage from rragent-brain/agents/base.py:
+    - Publish to `rragent:{agent}` channel
+    - Wait for response on `rragent:{agent}` with matching reply_to
     """
 
     def __init__(self, redis_url: str = "redis://127.0.0.1:6379/0"):
@@ -129,8 +129,8 @@ class PyAgentBridge:
             "timestamp": time.time(),
         }
 
-        channel = f"openclaw:{agent}"
-        reply_channel = f"openclaw:rragent"
+        channel = f"rragent:{agent}"
+        reply_channel = f"rragent:rragent"
 
         # Subscribe to reply channel before publishing
         pubsub = self._redis.pubsub()

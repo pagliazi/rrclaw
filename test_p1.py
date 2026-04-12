@@ -21,7 +21,7 @@ from rragent.context.engine import ContextEngine
 from rragent.runtime.session import Session
 
 SKILLS_DIR = os.path.expanduser(
-    "~/OpenClaw-Universe/openclaw-brain/agents/skills"
+    "~/OpenClaw-Universe/rragent-brain/agents/skills"
 )
 
 
