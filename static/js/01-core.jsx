@@ -200,6 +200,16 @@ function formatTokenCost(session) {
 
 function genId() { return 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
+function useIsMobile() {
+  const [mobile, setMobile] = React.useState(window.innerWidth < 768);
+  React.useEffect(() => {
+    const handler = () => setMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return mobile;
+}
+
 // ── Shared Components ────────────────────────────────
 
 function Spinner({size}) {

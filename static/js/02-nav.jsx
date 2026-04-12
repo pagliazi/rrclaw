@@ -27,10 +27,10 @@ function LoginPage({onLogin}) {
       <div className="relative w-full max-w-[400px] px-6 animate-scale-in">
         <div className="text-center mb-8">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-brand-600/15 border border-brand-500/20 flex items-center justify-center mb-5 shadow-lg shadow-brand-600/10">
-            <span className="text-3xl">🦀</span>
+            <span className="text-3xl">📊</span>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">OpenClaw</h1>
-          <p className="text-sm text-zinc-500 mt-1.5">多智能体协作平台</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">RRCLAW</h1>
+          <p className="text-sm text-zinc-500 mt-1.5">A股量化智能体</p>
         </div>
         <form onSubmit={handleSubmit} className="glass rounded-2xl p-6 space-y-4 shadow-2xl shadow-black/30 gradient-border">
           <div>
@@ -50,7 +50,7 @@ function LoginPage({onLogin}) {
             {loading ? <span className="flex items-center justify-center gap-2"><Spinner size={4} /> 登录中...</span> : '登 录'}
           </button>
         </form>
-        <p className="text-center text-[11px] text-zinc-700 mt-6">OpenClaw Multi-Agent System · v2.0</p>
+        <p className="text-center text-[11px] text-zinc-700 mt-6">RRCLAW Multi-Agent System · v2.0</p>
       </div>
     </div>
   );
@@ -148,14 +148,38 @@ function NavRail({currentView, onViewChange, agents, user, onLogout, splitView, 
       : <path d="M15 18l-6-6 6-6"/>}
   </svg>;
 
-  return (
-    <div className={`${collapsed ? 'w-[52px]' : 'w-[160px]'} h-full bg-surface-0 border-r border-border flex flex-col py-3 flex-shrink-0 transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]`}>
+  const mobileNavItems = [
+    {id:'dashboard',label:'首页',icon:<svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="4" rx="2"/><rect x="14" y="11" width="7" height="10" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/></svg>},
+    {id:'chat',label:'对话',icon:<svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>},
+    {id:'quant',label:'量化',icon:<svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-8"/></svg>},
+    {id:'market',label:'行情',icon:<svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>},
+    {id:'system',label:'系统',icon:<svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>},
+  ];
+
+  return (<>
+    {/* Mobile bottom tab bar */}
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-0/95 backdrop-blur-xl border-t border-border flex items-center justify-around" style={{height:'56px'}}>
+      {mobileNavItems.map(v => {
+        const isActive = currentView === v.id;
+        return (
+          <button key={v.id} onClick={() => onViewChange(v.id)}
+            className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive ? 'text-brand-400' : 'text-zinc-500 active:text-zinc-300'}`}>
+            <span className={isActive ? 'scale-110' : ''}>{v.icon}</span>
+            <span className={`text-[10px] font-medium ${isActive ? 'text-brand-400' : ''}`}>{v.label}</span>
+            {isActive && <span className="absolute bottom-1 w-5 h-0.5 bg-brand-500 rounded-full"></span>}
+          </button>
+        );
+      })}
+    </div>
+
+    {/* Desktop NavRail */}
+    <div className={`hidden md:flex ${collapsed ? 'w-[52px]' : 'w-[160px]'} h-full bg-surface-0 border-r border-border flex-col py-3 flex-shrink-0 transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]`}>
       <div className={`flex items-center ${collapsed ? 'justify-center px-0' : 'justify-between px-3'} mb-3`}>
         <div className="w-8 h-8 rounded-xl bg-brand-600/20 flex items-center justify-center cursor-pointer hover:bg-brand-600/30 transition-all duration-200 flex-shrink-0 hover:shadow-[0_0_12px_rgba(99,102,241,.2)]"
           onClick={()=>onViewChange('dashboard')}>
-          <span className="text-base">🦀</span>
+          <span className="text-base">📊</span>
         </div>
-        {!collapsed && <span className="text-xs font-bold text-brand-400 tracking-wide">RRClaw</span>}
+        {!collapsed && <span className="text-xs font-bold text-brand-400 tracking-wide">RRCLAW</span>}
         <button onClick={()=>setCollapsed(!collapsed)}
           className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-zinc-400 transition-all duration-200 rounded-lg hover:bg-surface-2 flex-shrink-0">
           {collapseBtn}
@@ -214,5 +238,5 @@ function NavRail({currentView, onViewChange, agents, user, onLogout, splitView, 
         </div>
       </div>
     </div>
-  );
+  </>);
 }

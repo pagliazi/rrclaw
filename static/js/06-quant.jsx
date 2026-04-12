@@ -30,11 +30,11 @@ function MetricsGrid({m}) {
   ].filter(x => x.v != null);
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
         {highlights.filter(h => h.v != null).map(h => <MetricCard key={h.k} label={h.l} value={h.v} unit={h.u} color={h.color} />)}
       </div>
       {extras.length > 0 && (
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-1.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5">
           {extras.map((e,i) => <MetricCard key={i} label={e.l} value={e.v} unit={e.u} color={e.color} small />)}
         </div>
       )}
@@ -48,7 +48,7 @@ function TradeTable({trades, title, colorFn}) {
     <div>
       <h4 className="text-[11px] font-medium text-zinc-400 mb-2">{title}</h4>
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-[11px]">
+        <table className="w-full text-[10px] md:text-[11px]">
           <thead><tr className="bg-surface-3 text-zinc-500">
             <th className="px-2 py-1.5 text-left font-medium">股票</th>
             <th className="px-2 py-1.5 text-left font-medium">买入日</th>
@@ -149,7 +149,7 @@ function TopStocksTable({stocks}) {
     <Card>
       <h4 className="text-[12px] font-semibold text-zinc-300 mb-2">高频交易股票 TOP {stocks.length}</h4>
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-[11px]">
+        <table className="w-full text-[10px] md:text-[11px]">
           <thead><tr className="bg-surface-3 text-zinc-500">
             <th className="px-2.5 py-1.5 text-left font-medium">股票代码</th>
             <th className="px-2.5 py-1.5 text-right font-medium">交易次数</th>
@@ -614,7 +614,7 @@ function QuantView() {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-4 animate-fade-in">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">量化策略研发</h1>
@@ -843,7 +843,7 @@ function QuantView() {
                       </div>
                     </div>
                     <div className="overflow-x-auto rounded-lg border border-border max-h-[300px] overflow-y-auto">
-                      <table className="w-full text-[11px]">
+                      <table className="w-full text-[10px] md:text-[11px]">
                         <thead className="sticky top-0"><tr className="bg-surface-3 text-zinc-500">
                           <th className="px-2 py-1.5 text-left font-medium">代码</th>
                           <th className="px-2 py-1.5 text-left font-medium">名称</th>
@@ -1232,7 +1232,7 @@ top_stocks = factor.iloc[-1].nlargest(20)  # 今日 Top 20`}</pre>
                       降维聚类 — {analysisData.clusters.combinable_factors} 可融合因子 → {analysisData.clusters.total} 独立聚类
                     </h4>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-[11px]">
+                      <table className="w-full text-[10px] md:text-[11px]">
                         <thead><tr className="text-zinc-500 border-b border-border/30">
                           <th className="py-1.5 px-2 text-left">#</th>
                           <th className="py-1.5 px-2 text-left">代表因子</th>
@@ -1369,7 +1369,7 @@ top_stocks = factor.iloc[-1].nlargest(20)  # 今日 Top 20`}</pre>
               <Card>
                 <h4 className="text-[12px] font-semibold text-zinc-300 mb-2">组合结果 ({exhaustiveResults.length})</h4>
                 <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                  <table className="w-full text-[11px]">
+                  <table className="w-full text-[10px] md:text-[11px]">
                     <thead><tr className="text-zinc-500 border-b border-border/30 sticky top-0 bg-surface-1">
                       <th className="py-1.5 px-2 text-left">#</th>
                       <th className="py-1.5 px-2 text-left">因子组合</th>

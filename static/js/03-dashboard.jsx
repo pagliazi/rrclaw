@@ -19,11 +19,11 @@ function DashboardView({agents, channels, onViewChange, onSend}) {
   }, [agents]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6 animate-fade-in">
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
-          <p className="text-sm text-zinc-500 mt-1">OpenClaw 多智能体系统</p>
+          <p className="text-sm text-zinc-500 mt-1">RRCLAW A股量化智能体</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
@@ -52,7 +52,7 @@ function DashboardView({agents, channels, onViewChange, onSend}) {
               <h2 className="text-sm font-semibold text-zinc-300">{cat.label}</h2>
               <span className="text-[11px] text-zinc-600">{items.filter(i=>i.status==='online').length}/{items.filter(i=>i.status!=='sleeping').length}{items.some(i=>i.status==='sleeping')?<span className="text-blue-500/50 ml-1">+{items.filter(i=>i.status==='sleeping').length}休眠</span>:null}</span>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {items.map(agent => (
                 <div key={agent.name}
                   onClick={() => { onViewChange('chat'); }}
@@ -81,7 +81,7 @@ function DashboardView({agents, channels, onViewChange, onSend}) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 animate-slide-up">
         <Card className="!p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-base">🦀</span>
+            <span className="text-base">📊</span>
             <h3 className="text-sm font-semibold text-zinc-200">RRCLAW</h3>
           </div>
           <div className="space-y-1.5 text-[12px]">

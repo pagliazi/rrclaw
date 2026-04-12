@@ -2,7 +2,7 @@
 
 function ChatSidebar({conversations, activeId, onSelect, onCreate, onDelete, collapsed, onToggle}) {
   return (
-    <div className={`h-full bg-surface-1 border-r border-border flex flex-col flex-shrink-0 transition-all duration-200 ${collapsed ? 'w-0 overflow-hidden border-0' : 'w-[260px]'}`}>
+    <div className={`h-full bg-surface-1 border-r border-border flex flex-col flex-shrink-0 transition-all duration-200 ${collapsed ? 'w-0 overflow-hidden border-0' : 'hidden md:flex w-[260px]'}`}>
       <div className="p-3 flex items-center gap-2">
         <button onClick={onCreate}
           className="btn flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-surface-2 hover:bg-surface-3 border border-border hover:border-border-light rounded-xl text-[13px] text-zinc-300 font-medium transition">
@@ -139,7 +139,7 @@ function ChatMessage({msg, isLast}) {
 
   return (
     <div className={`animate-slide-up flex ${isUser?'justify-end':'justify-start'} mb-5`}>
-      <div className={`max-w-[75%] ${isUser?'':'flex gap-3'}`}>
+      <div className={`max-w-[95%] md:max-w-[75%] ${isUser?'':'flex gap-3'}`}>
         {!isUser && (
           <div className="w-8 h-8 rounded-xl bg-brand-600/15 flex items-center justify-center text-sm flex-shrink-0 mt-0.5">{agentInfo.icon}</div>
         )}
@@ -301,7 +301,7 @@ function ChatView({conversations, activeConvId, messages, onSend, isThinking, ch
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex-1 overflow-y-auto px-3 md:px-6 py-4 md:py-6">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in">
               <div className="w-16 h-16 rounded-2xl bg-brand-600/10 flex items-center justify-center mb-5 glow-brand">
@@ -309,7 +309,7 @@ function ChatView({conversations, activeConvId, messages, onSend, isThinking, ch
               </div>
               <h2 className="text-xl font-bold text-white mb-1.5">与 {thinkingAgent.label} 对话</h2>
               <p className="text-zinc-500 text-sm mb-8 max-w-sm">{thinkingAgent.desc}。输入自由文本或使用 / 命令。</p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 max-w-2xl w-full">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-2.5 max-w-2xl w-full px-2 md:px-0">
                 {QUICK.map(q => (
                   <button key={q.cmd} onClick={()=>handleSend('/'+q.cmd)}
                     className="btn flex flex-col items-start gap-1 p-3 bg-surface-2 hover:bg-surface-3 border border-border hover:border-border-light rounded-xl transition-all text-left group">
@@ -327,7 +327,7 @@ function ChatView({conversations, activeConvId, messages, onSend, isThinking, ch
             <div className="animate-slide-up flex justify-start mb-5">
               <div className="flex gap-3">
                 <div className="w-8 h-8 rounded-xl bg-brand-600/15 flex items-center justify-center text-sm flex-shrink-0">{thinkingAgent.icon}</div>
-                <div className="min-w-0 max-w-[65%]">
+                <div className="min-w-0 max-w-[85%] md:max-w-[65%]">
                   <div className="text-[11px] text-zinc-500 mb-1">{thinkingAgent.label} 思考中...</div>
                   {thinkingText && <ThinkingBubble text={thinkingText} />}
                   {activeToolCalls && activeToolCalls.length > 0 && (
@@ -345,8 +345,8 @@ function ChatView({conversations, activeConvId, messages, onSend, isThinking, ch
           <div ref={chatEnd} />
         </div>
 
-        <div className="border-t border-border px-5 py-4 bg-surface-0/80 backdrop-blur-sm">
-          <div className="flex items-end gap-3 max-w-3xl mx-auto relative">
+        <div className="border-t border-border px-3 md:px-5 py-3 md:py-4 bg-surface-0/80 backdrop-blur-sm">
+          <div className="flex items-end gap-2 md:gap-3 max-w-3xl mx-auto relative">
             <div className="flex-1 bg-surface-4 border border-border-light rounded-2xl overflow-hidden focus-within:border-brand-500/40 focus-within:shadow-[0_0_0_3px_rgba(99,102,241,.08)] transition-all relative">
               {showMention && <MentionPopup filter={mentionFilter} onSelect={handleMentionSelect} position={16} />}
               <textarea ref={inputRef} value={input} onChange={handleInputChange}
@@ -357,7 +357,7 @@ function ChatView({conversations, activeConvId, messages, onSend, isThinking, ch
                 placeholder={`给 ${thinkingAgent.label} 发消息...`}
                 rows={1}
                 className="w-full bg-transparent px-4 py-3 text-[14px] text-zinc-50 placeholder-zinc-500 focus:outline-none"
-                style={{maxHeight:'120px',minHeight:'44px'}}
+                style={{maxHeight:'120px',minHeight:'48px'}}
                 onInput={e=>{e.target.style.height='auto';e.target.style.height=Math.min(e.target.scrollHeight,120)+'px';}}
               />
             </div>
