@@ -24,6 +24,7 @@ import yaml
 from rrclaw.tools.base import ToolSpec
 from rrclaw.tools.registry import GlobalToolRegistry, ToolIndex
 from rrclaw.tools.search import ToolSearchTool
+from rrclaw.tools.builtin.factor_tools import FactorMineTool, FactorEvaluateTool, FactorCombineTool, FactorListTool
 from rrclaw.tools.pyagent.bridge import PyAgentBridge, PyAgentTool, PYAGENT_COMMANDS
 
 logger = logging.getLogger("rrclaw.tools.index_builder")
@@ -32,6 +33,95 @@ logger = logging.getLogger("rrclaw.tools.index_builder")
 TIER0_COMMANDS = {"summary", "ask"}
 
 # Extra Tier 0 tools not in PYAGENT_COMMANDS (custom-registered like P0)
+# Factor Mining & Quant Tools (Tier 0 — core quant capabilities)
+QUANT_TOOLS = [
+    {
+        "command": "factor_mine",
+        "agent": "orchestrator",
+        "action": "digger",
+        "description": "挖掘新的 Alpha 因子。指定挖掘轮数和每轮因子数量。返回发现的因子列表及其 Sharpe/IC/IR 指标。",
+        "timeout": 600,
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "rounds": {"type": "integer", "default": 3, "description": "挖掘轮数"},
+                "factors": {"type": "integer", "default": 5, "description": "每轮生成因子数"},
+            },
+        },
+    },
+    {
+        "command": "factor_evaluate",
+        "agent": "backtest",
+        "action": "quant_validate",
+        "description": "评估因子质量：计算 Sharpe、IC、IR、胜率、最大回撤。自动进行 PBO 交叉验证检测过拟合。",
+        "timeout": 300,
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "code": {"type": "string", "description": "因子 Python 代码"},
+                "start_date": {"type": "string", "default": "", "description": "回测起始日期 (YYYY-MM-DD)"},
+                "end_date": {"type": "string", "default": "", "description": "回测结束日期"},
+            },
+            "required": ["code"],
+        },
+    },
+    {
+        "command": "factor_combine",
+        "agent": "orchestrator",
+        "action": "combine",
+        "description": "智能融合多个因子。从因子库选取表现最好的因子进行加权/乘法/排名融合，生成新的组合因子。",
+        "timeout": 600,
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "count": {"type": "integer", "default": 2, "description": "融合因子数量"},
+                "mode": {"type": "string", "default": "smart", "description": "融合模式: smart/add/multiply/rank"},
+            },
+        },
+    },
+    {
+        "command": "factor_list",
+        "agent": "backtest",
+        "action": "list_ledger",
+        "description": "查看因子库：列出所有活跃因子及其 Sharpe、胜率、评级。",
+        "timeout": 15,
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "command": "strategy_backtest",
+        "agent": "backtest",
+        "action": "run_backtest",
+        "description": "执行策略回测：支持 backtrader 和 vectorbt 引擎。输入策略代码和标的，返回收益曲线、夏普、最大回撤。",
+        "timeout": 300,
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "code": {"type": "string", "description": "策略 Python 代码"},
+                "stock": {"type": "string", "default": "000001.SZ", "description": "回测标的代码"},
+                "start_date": {"type": "string", "default": "2025-01-01", "description": "起始日期"},
+                "end_date": {"type": "string", "default": "2026-01-01", "description": "结束日期"},
+                "mode": {"type": "string", "default": "backtrader", "description": "引擎: backtrader/vectorbt"},
+            },
+            "required": ["code"],
+        },
+    },
+    {
+        "command": "factor_screen",
+        "agent": "orchestrator",
+        "action": "screen",
+        "description": "使用因子进行选股筛选。输入选股条件 DSL，返回符合条件的股票列表。",
+        "timeout": 60,
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "dsl": {"type": "string", "description": "选股 DSL 条件，如 'pct_chg > 5 AND volume_ratio > 3'"},
+                "limit": {"type": "integer", "default": 20, "description": "返回数量"},
+            },
+            "required": ["dsl"],
+        },
+    },
+]
+
 EXTRA_TIER0_TOOLS = [
     {
         "command": "market_data",
@@ -206,6 +296,23 @@ def build_tool_registry(
         )
         registry.register_tier0(tool)
         tier0_count += 1
+
+    # ── Step 0b: Register Factor/Quant tools as Tier 0 (direct implementation) ──
+    registry.register_tier0(FactorMineTool())
+    registry.register_tier0(FactorEvaluateTool(bridge=bridge))
+    registry.register_tier0(FactorCombineTool())
+    registry.register_tier0(FactorListTool())
+    tier0_count += 4
+    # strategy_backtest and factor_screen still go through PyAgent
+    for qt in QUANT_TOOLS:
+        if qt["command"] in ("strategy_backtest", "factor_screen"):
+            tool = PyAgentTool(
+                command=qt["command"], agent=qt["agent"], action=qt["action"],
+                description=qt["description"], timeout=qt.get("timeout", 30),
+                bridge=bridge, input_schema=qt.get("input_schema"),
+            )
+            registry.register_tier0(tool)
+            tier0_count += 1
 
     # ── Step 1: Register all PYAGENT_COMMANDS ──
     yaml_skills = _load_skills_from_yaml(skills_dir) if skills_dir else []

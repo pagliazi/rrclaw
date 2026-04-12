@@ -1094,6 +1094,12 @@ async def api_market_overview():
 
 @app.get("/api/digger/status")
 async def api_digger_status(request: Request):
+    if pyagent_bridge and pyagent_bridge.is_connected:
+        try:
+            result = await pyagent_bridge.call_agent("backtest", "list_ledger", {}, timeout=15)
+            return {"status": "ok", "text": str(result)}
+        except Exception:
+            pass
     user = getattr(request.state, "user", None)
     uid = f"web_{user['sub']}" if user else "webchat_default"
     result = await send_to_orchestrator("digger_status", "", uid=uid)
@@ -1105,66 +1111,29 @@ async def api_digger_start(request: Request):
     body = await request.json()
     rounds = body.get("rounds", 5)
     factors = body.get("factors", 5)
-    interval = body.get("interval", 30)
-
-    args = json.dumps({"rounds": rounds, "factors": factors, "interval": interval})
-    msg_id = uuid.uuid4().hex[:12]
-    reply_channel = f"openclaw:reply:{msg_id}"
-    progress_channel = f"openclaw:digger_progress:{msg_id}"
 
     async def event_stream():
-        r = await get_redis()
-        pubsub = r.pubsub()
-        await pubsub.subscribe(progress_channel, reply_channel)
-
-        user = getattr(request.state, "user", None)
-        uid = f"web_{user['sub']}" if user else "webchat_default"
-
-        msg = json.dumps({
-            "id": msg_id, "sender": "rrclaw", "target": "orchestrator",
-            "action": "route",
-            "params": {
-                "command": "digger", "args": args,
-                "reply_channel": reply_channel,
-                "progress_channel": progress_channel, "uid": uid,
-            },
-            "timestamp": time.time(),
-        })
-        await r.publish("openclaw:orchestrator", msg)
-
         yield f"data: {json.dumps({'type': 'started', 'rounds': rounds, 'factors': factors})}\n\n"
-
         try:
-            deadline = time.time() + LONG_TIMEOUT
-            while time.time() < deadline:
-                raw = await asyncio.wait_for(
-                    pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0), timeout=5.0)
-                if raw is None:
-                    yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
-                    continue
-                if raw["type"] != "message":
-                    continue
-                channel = raw.get("channel", "")
-                if isinstance(channel, bytes):
-                    channel = channel.decode()
-                data = json.loads(raw["data"])
-
-                if channel == progress_channel:
-                    evt_type = data.get("type", "progress")
-                    text = data.get("text", "")
-                    yield f"data: {json.dumps({'type': evt_type, 'text': text}, ensure_ascii=False)}\n\n"
-                    if evt_type == "done":
-                        break
-                elif channel == reply_channel:
-                    text = data.get("text", "")
-                    yield f"data: {json.dumps({'type': 'done', 'text': text}, ensure_ascii=False)}\n\n"
-                    break
+            if pyagent_bridge and pyagent_bridge.is_connected:
+                result = await pyagent_bridge.call_agent(
+                    "backtest", "digger",
+                    {"rounds": rounds, "factors": factors},
+                    timeout=600,
+                )
+                yield f"data: {json.dumps({'type': 'done', 'text': str(result)}, ensure_ascii=False)}\n\n"
+            else:
+                # Fallback to orchestrator
+                user = getattr(request.state, "user", None)
+                uid = f"web_{user['sub']}" if user else "webchat_default"
+                args = json.dumps({"rounds": rounds, "factors": factors})
+                result = await send_to_orchestrator("digger", args, uid=uid, timeout=600)
+                yield f"data: {json.dumps({'type': 'done', 'text': result}, ensure_ascii=False)}\n\n"
         except asyncio.TimeoutError:
             yield f"data: {json.dumps({'type': 'error', 'text': '超时'})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'text': str(e)})}\n\n"
         finally:
-            await pubsub.unsubscribe(progress_channel, reply_channel)
             yield "data: {\"type\":\"close\"}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream",
@@ -1213,6 +1182,16 @@ async def api_digger_retire(request: Request):
     factor_id = body.get("factor_id", "")
     if not factor_id:
         raise HTTPException(400, "factor_id required")
+    # Prefer PyAgent path
+    if pyagent_bridge and pyagent_bridge.is_connected:
+        try:
+            result = await pyagent_bridge.call_agent(
+                "backtest", "retire", {"factor_id": factor_id}, timeout=30,
+            )
+            return {"ok": True, "factor_id": factor_id, "result": result}
+        except Exception:
+            pass
+    # Fallback: direct FactorLibrary
     try:
         import sys
         brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
@@ -1230,95 +1209,105 @@ async def api_digger_retire(request: Request):
 async def api_digger_combine(request: Request):
     body = await request.json()
     factor_ids = body.get("factor_ids", [])
+    count = body.get("max_factors", body.get("count", 5))
+    mode = body.get("mode", "smart")
 
     try:
-        import sys
-        brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
-        if brain_path not in sys.path:
-            sys.path.insert(0, brain_path)
-        from agents.factor_library import FactorLibrary
-        from agents.bridge_client import get_bridge_client
-        from datetime import date, timedelta
-
-        lib = FactorLibrary(redis_client=await get_redis())
-        bridge = get_bridge_client()
-
-        if factor_ids:
-            all_factors = await lib.get_all_factors(status="active")
-            candidates = [f for f in all_factors if f.id in factor_ids]
-        else:
-            candidates = await lib.get_combine_candidates()
-
-        if len(candidates) < 2:
-            return {"ok": False, "error": f"需要至少 2 个因子，当前 {len(candidates)} 个"}
-
-        max_combine = body.get("max_factors", 5)
-        top_n = candidates[:max_combine]
-        input_factors_info = []
-        codes, summaries = [], []
-        for i, f in enumerate(top_n):
-            renamed = f.code.replace("def generate_factor(", f"def _factor_{i+1}(")
-            codes.append(f"# --- factor {i+1}: {f.sub_theme or f.theme} (sharpe={f.sharpe:.3f}, ir={f.ir:.3f}) ---\n{renamed}")
-            summaries.append(f"{f.id}: {f.sub_theme or f.theme} sharpe={f.sharpe:.3f} ir={f.ir:.3f}")
-            input_factors_info.append({
-                "id": f.id, "theme": f.sub_theme or f.theme,
-                "sharpe": f.sharpe, "ir": f.ir, "ic_mean": f.ic_mean,
-                "win_rate": f.win_rate, "trades": f.trades, "max_drawdown": f.max_drawdown,
-            })
-
-        combiner = (
-            "\n\nimport numpy as np\nimport pandas as pd\n\n"
-            "def generate_factor(matrices):\n"
-            "    factors = []\n"
-        )
-        for i in range(len(top_n)):
-            combiner += f"    try:\n        factors.append(_factor_{i+1}(matrices))\n    except Exception:\n        pass\n"
-        combiner += (
-            "    if not factors:\n"
-            "        return pd.DataFrame(0, index=matrices['close'].index, columns=matrices['close'].columns)\n"
-            "    stacked = np.stack([f.values for f in factors], axis=0)\n"
-            "    combined = np.nanmean(stacked, axis=0)\n"
-            "    return pd.DataFrame(combined, index=matrices['close'].index, columns=matrices['close'].columns)\n"
-        )
-        combined_code = "\n\n".join(codes) + combiner
-
-        start_date = (date.today() - timedelta(days=180)).isoformat()
-        end_date = date.today().isoformat()
-
-        combined_metrics = {}
-        result_text = ""
-        try:
-            resp = await bridge.run_factor_mining(
-                factor_code=combined_code, start_date=start_date, end_date=end_date,
+        if pyagent_bridge and pyagent_bridge.is_connected:
+            result = await pyagent_bridge.call_agent(
+                "backtest", "combine",
+                {"count": count, "mode": mode, "factor_ids": factor_ids},
+                timeout=600,
             )
-            if resp.get("status") == "error":
-                result_text = f"沙箱执行失败: {resp.get('error', '未知错误')}"
+            return {"ok": True, "result": result}
+        else:
+            # Fallback: use FactorLibrary + orchestrator (legacy path)
+            import sys
+            brain_path = os.path.expanduser("~/OpenClaw-Universe/openclaw-brain")
+            if brain_path not in sys.path:
+                sys.path.insert(0, brain_path)
+            from agents.factor_library import FactorLibrary
+            from agents.bridge_client import get_bridge_client
+            from datetime import date, timedelta
+
+            lib = FactorLibrary(redis_client=await get_redis())
+            bridge_client = get_bridge_client()
+
+            if factor_ids:
+                all_factors = await lib.get_all_factors(status="active")
+                candidates = [f for f in all_factors if f.id in factor_ids]
             else:
-                combined_metrics = resp.get("metrics") or {}
-                result_text = json.dumps(resp, ensure_ascii=False, indent=2)[:3000]
-        except Exception as e:
-            result_text = f"Bridge 调用失败: {e}"
+                candidates = await lib.get_combine_candidates()
 
-        evaluation = lib.evaluate_combine_quality(input_factors_info, combined_metrics)
-        verdict = evaluation["verdict"]
+            if len(candidates) < 2:
+                return {"ok": False, "error": f"需要至少 2 个因子，当前 {len(candidates)} 个"}
 
-        record = {
-            "input_factors": input_factors_info,
-            "input_factor_ids": [f.id for f in top_n],
-            "combined_code_preview": combined_code[:2000],
-            "combined_metrics": combined_metrics,
-            "evaluation": evaluation,
-            "verdict": verdict,
-            "result_raw": result_text[:3000] if isinstance(result_text, str) else "",
-            "status": "accepted" if verdict == "accept" else "rejected" if verdict == "reject" else "marginal",
-        }
-        record_id = await lib.save_combine_record(record)
+            top_n = candidates[:count]
+            input_factors_info = []
+            codes, summaries = [], []
+            for i, f in enumerate(top_n):
+                renamed = f.code.replace("def generate_factor(", f"def _factor_{i+1}(")
+                codes.append(f"# --- factor {i+1}: {f.sub_theme or f.theme} (sharpe={f.sharpe:.3f}, ir={f.ir:.3f}) ---\n{renamed}")
+                summaries.append(f"{f.id}: {f.sub_theme or f.theme} sharpe={f.sharpe:.3f} ir={f.ir:.3f}")
+                input_factors_info.append({
+                    "id": f.id, "theme": f.sub_theme or f.theme,
+                    "sharpe": f.sharpe, "ir": f.ir, "ic_mean": f.ic_mean,
+                    "win_rate": f.win_rate, "trades": f.trades, "max_drawdown": f.max_drawdown,
+                })
 
-        return {
-            "ok": True, "record_id": record_id, "factors_used": len(top_n),
-            "summaries": summaries, "verdict": verdict, "evaluation": evaluation,
-            "combined_metrics": combined_metrics, "result": result_text,
-        }
+            combiner = (
+                "\n\nimport numpy as np\nimport pandas as pd\n\n"
+                "def generate_factor(matrices):\n"
+                "    factors = []\n"
+            )
+            for i in range(len(top_n)):
+                combiner += f"    try:\n        factors.append(_factor_{i+1}(matrices))\n    except Exception:\n        pass\n"
+            combiner += (
+                "    if not factors:\n"
+                "        return pd.DataFrame(0, index=matrices['close'].index, columns=matrices['close'].columns)\n"
+                "    stacked = np.stack([f.values for f in factors], axis=0)\n"
+                "    combined = np.nanmean(stacked, axis=0)\n"
+                "    return pd.DataFrame(combined, index=matrices['close'].index, columns=matrices['close'].columns)\n"
+            )
+            combined_code = "\n\n".join(codes) + combiner
+
+            start_date = (date.today() - timedelta(days=180)).isoformat()
+            end_date = date.today().isoformat()
+
+            combined_metrics = {}
+            result_text = ""
+            try:
+                resp = await bridge_client.run_factor_mining(
+                    factor_code=combined_code, start_date=start_date, end_date=end_date,
+                )
+                if resp.get("status") == "error":
+                    result_text = f"沙箱执行失败: {resp.get('error', '未知错误')}"
+                else:
+                    combined_metrics = resp.get("metrics") or {}
+                    result_text = json.dumps(resp, ensure_ascii=False, indent=2)[:3000]
+            except Exception as e:
+                result_text = f"Bridge 调用失败: {e}"
+
+            evaluation = lib.evaluate_combine_quality(input_factors_info, combined_metrics)
+            verdict = evaluation["verdict"]
+
+            record = {
+                "input_factors": input_factors_info,
+                "input_factor_ids": [f.id for f in top_n],
+                "combined_code_preview": combined_code[:2000],
+                "combined_metrics": combined_metrics,
+                "evaluation": evaluation,
+                "verdict": verdict,
+                "result_raw": result_text[:3000] if isinstance(result_text, str) else "",
+                "status": "accepted" if verdict == "accept" else "rejected" if verdict == "reject" else "marginal",
+            }
+            record_id = await lib.save_combine_record(record)
+
+            return {
+                "ok": True, "record_id": record_id, "factors_used": len(top_n),
+                "summaries": summaries, "verdict": verdict, "evaluation": evaluation,
+                "combined_metrics": combined_metrics, "result": result_text,
+            }
     except Exception as e:
         logger.error(f"digger/combine error: {e}", exc_info=True)
         return {"ok": False, "error": str(e)}
