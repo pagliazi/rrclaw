@@ -194,7 +194,7 @@ function YaoIterationTimeline({log, loading}) {
     <div className="text-center text-zinc-600 text-sm py-6">暂无迭代记录</div>
   );
   return (
-    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+    <div className="space-y-2 max-h-64 overflow-y-auto overflow-x-hidden pr-1">
       {log.map((ev, i) => {
         const isAnalysis = ev.type === 'analysis';
         const isIterate  = ev.type === 'iterate';
@@ -346,7 +346,7 @@ function YaoView() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-5 view-enter">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-5 view-enter">
 
         {/* ── 概览 Tab ── */}
         {tab === 'overview' && (

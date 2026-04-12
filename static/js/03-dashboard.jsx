@@ -19,7 +19,7 @@ function DashboardView({agents, channels, onViewChange, onSend}) {
   }, [agents]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8 space-y-6 animate-fade-in">
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>

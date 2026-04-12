@@ -201,7 +201,7 @@ function App() {
   return (
     <ToastProvider>
       <AuthContext.Provider value={authUser}>
-        <div className="flex flex-col md:flex-row h-screen bg-surface-0">
+        <div className="flex flex-col md:flex-row h-screen bg-surface-0 overflow-x-hidden max-w-[100vw]">
           <NavRail currentView={currentView} onViewChange={(v) => { setCurrentView(v); if (v !== 'chat' && v !== 'dashboard') setSplitPanel(v); }} agents={agents} user={authUser} onLogout={handleLogout} splitView={splitView} onToggleSplit={() => setSplitView(!splitView)} />
           <div className="flex-1 flex h-full min-w-0 pb-14 md:pb-0" key={splitView ? 'split' : currentView}>
             {splitView && currentView === 'chat' ? (
@@ -215,7 +215,7 @@ function App() {
                     onNewConv={handleNewConv} onSelectConv={handleSelectConv} onDeleteConv={handleDeleteConv}
                     agents={agents} activeToolCalls={activeToolCalls} thinkingText={thinkingText} tokenSession={tokenSession} />
                 </div>
-                <div className="w-[45%] flex h-full min-w-0 overflow-hidden">
+                <div className="hidden md:flex w-[45%] h-full min-w-0 overflow-hidden">
                   {splitPanel === 'system' && canWrite && <SystemView />}
                   {splitPanel === 'quant' && <QuantView />}
                   {splitPanel === 'market' && <MarketView />}

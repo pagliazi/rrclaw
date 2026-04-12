@@ -29,7 +29,7 @@ function InfraMonitorView() {
   const statusDot = (s) => s==='ok'||s==='online' ? 'bg-emerald-400' : s==='warn'||s==='slow' ? 'bg-yellow-400' : 'bg-red-400';
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 animate-fade-in">
       <h1 className="text-xl font-bold text-white mb-4">基础设施监控</h1>
       <div className="flex gap-2 mb-4 flex-wrap">
         {tabItems.map(t => (
@@ -119,7 +119,7 @@ function PlanTracePanel() {
   const levelColor = {'L0':'text-accent-emerald','L1':'text-accent-blue','L2':'text-accent-amber'};
   const fmtTs = ts => ts ? new Date(ts * 1000).toLocaleTimeString('zh-CN') : '';
   return React.createElement('div', {className:'flex gap-4 h-full'},
-    React.createElement('div', {className:'w-72 flex-shrink-0 bg-surface-2 rounded-xl border border-border p-3 flex flex-col gap-2 overflow-y-auto'},
+    React.createElement('div', {className:'w-72 flex-shrink-0 bg-surface-2 rounded-xl border border-border p-3 flex flex-col gap-2 overflow-y-auto overflow-x-hidden'},
       React.createElement('div', {className:'flex items-center justify-between mb-1'},
         React.createElement('span', {className:'text-sm font-semibold text-white'}, '路由轨迹'),
         React.createElement('button', {onClick: fetchHistory, className:'text-xs text-brand-400 hover:text-brand-300 px-2 py-0.5 rounded'}, loading ? '…' : '刷新')
@@ -138,7 +138,7 @@ function PlanTracePanel() {
         )
       ))
     ),
-    detail ? React.createElement('div', {className:'flex-1 bg-surface-2 rounded-xl border border-border p-4 overflow-y-auto text-xs space-y-4'},
+    detail ? React.createElement('div', {className:'flex-1 bg-surface-2 rounded-xl border border-border p-4 overflow-y-auto overflow-x-hidden text-xs space-y-4'},
       React.createElement('div', {className:'flex items-center gap-3 pb-2 border-b border-border'},
         React.createElement('span', {className:`font-bold text-base ${levelColor[detail.route_level]||'text-gray-400'}`}, detail.route_level),
         React.createElement('span', {className:'text-white font-medium flex-1'}, detail.input),
@@ -205,7 +205,7 @@ function AgentSkillsView() {
   const statusLabel = (s) => s==='online' ? '在线' : s==='slow' ? '缓慢' : '离线';
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 animate-fade-in">
       <h1 className="text-xl font-bold text-white mb-4">Agent & Skills</h1>
       <div className="flex gap-2 mb-4 flex-wrap">
         {tabItems.map(t => (
@@ -454,7 +454,7 @@ function SystemView() {
   const runCustom = async () => { if (!customCmd.trim()) return; setCustomLoading(true); const r = await apiPost('/api/command', {cmd:customCmd.trim(),args:customArgs.trim()}); setCustomResult(r.result!=null ? String(r.result) : ''); setCustomLoading(false); toast('命令已执行', r.error ? 'error' : 'success'); };
   useEffect(() => { refreshAll(); }, []);
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 space-y-4 animate-fade-in">
       <div className="flex items-center justify-between mb-1"><h1 className="text-xl font-bold text-white">系统状态</h1><button onClick={refreshAll} className="btn px-3 py-1.5 bg-surface-2 hover:bg-surface-3 rounded-lg text-[12px] text-zinc-400 border border-border hover:border-border-light transition">全部刷新</button></div>
       <SystemStatusCards />
       <LLMConfigPanel />
@@ -496,7 +496,7 @@ function ProfileView({user, onUpdateUser}) {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 animate-fade-in">
       <h1 className="text-xl font-bold text-white mb-6">个人资料</h1>
       <div className="max-w-lg space-y-6">
         <Card>
@@ -592,7 +592,7 @@ function AdminView({currentUser}) {
   if (loading) return <div className="flex-1 flex items-center justify-center"><LoadingBlock text="加载用户列表..." /></div>;
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-white">用户管理</h1>

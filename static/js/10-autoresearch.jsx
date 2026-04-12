@@ -55,7 +55,7 @@ function AutoResearchView() {
   const crashedResults = results.filter(r => r.status === 'crash');
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-white">AutoResearch MLX</h1>
@@ -173,7 +173,7 @@ function AutoResearchView() {
           <div className="px-5 py-3 border-b border-border">
             <h2 className="text-sm font-semibold text-zinc-300">Latest Log</h2>
           </div>
-          <pre className="px-5 py-4 text-xs text-zinc-500 overflow-x-auto whitespace-pre-wrap font-mono leading-relaxed max-h-[300px] overflow-y-auto">
+          <pre className="px-5 py-4 text-xs text-zinc-500 overflow-x-auto whitespace-pre-wrap font-mono leading-relaxed max-h-[300px] overflow-y-auto overflow-x-hidden">
             {status.log_tail}
           </pre>
         </div>

@@ -161,7 +161,7 @@ function ChatMessage({msg, isLast}) {
           <div className={`rounded-2xl px-4 py-3 text-[13.5px] leading-[1.7] ${isUser
             ?'bg-brand-600 text-white rounded-tr-md'
             :'bg-surface-2 text-zinc-200 border border-border rounded-tl-md'}`}>
-            <pre className="whitespace-pre-wrap font-[inherit] text-[13.5px]">{msg.content}</pre>
+            <pre className="whitespace-pre-wrap break-all overflow-x-auto max-w-full font-[inherit] text-[13.5px]">{msg.content}</pre>
           </div>
           <div className={`text-[10px] text-zinc-600 mt-1 ${isUser?'text-right':'text-left'}`}>
             {new Date(msg.ts||Date.now()).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}

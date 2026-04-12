@@ -269,7 +269,7 @@ function ViewWrapper({children, className}) {
 function DataBlock({data, loading, placeholder}) {
   if (loading) return <LoadingBlock />;
   if (!data) return <div className="text-zinc-600 text-sm py-4 text-center">{placeholder||'暂无数据'}</div>;
-  return <pre className="text-[13px] text-zinc-300 leading-[1.7] font-mono">{data}</pre>;
+  return <pre className="text-[13px] text-zinc-300 leading-[1.7] font-mono overflow-x-auto max-w-full break-words">{data}</pre>;
 }
 
 function ExpandableCode({code, label, defaultExpanded = true}) {

@@ -30,7 +30,7 @@ function NewsView() {
   useEffect(() => { loadNews(''); }, []);
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 animate-fade-in">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-white">新闻资讯</h1>
         <div className="flex gap-2">
@@ -104,7 +104,7 @@ function ToolsView() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 animate-fade-in">
       <h1 className="text-xl font-bold text-white mb-4">AI 工具箱</h1>
       <div className="flex gap-2 mb-4 flex-wrap">
         {tabs.map(t => (
@@ -246,7 +246,7 @@ function AppleView() {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 animate-fade-in">
       <h1 className="text-xl font-bold text-white mb-4">Apple 集成</h1>
       <div className="flex gap-2 mb-4 flex-wrap">
         {tabItems.map(t => (
@@ -687,7 +687,7 @@ function DevView() {
   const hostLabel = activeHost.label || sshHost;
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -803,7 +803,7 @@ function DevView() {
             <span className="text-[11px] font-semibold text-zinc-400">最近操作</span>
             <button onClick={() => setHistory([])} className="text-[10px] text-zinc-600 hover:text-zinc-400 transition">清空</button>
           </div>
-          <div className="space-y-1 max-h-32 overflow-y-auto">
+          <div className="space-y-1 max-h-32 overflow-y-auto overflow-x-hidden">
             {history.map((h, i) => (
               <div key={i} className="flex items-center gap-2 text-[11px]">
                 <span className={h.ok ? 'text-emerald-400' : 'text-rose-400'}>{h.ok ? '✓' : '✗'}</span>
@@ -1098,7 +1098,7 @@ function ApiUsageView() {
   const taskColors = {brief:'bg-amber-500',analysis:'bg-blue-500',code:'bg-violet-500',default:'bg-emerald-500'};
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 animate-fade-in">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-white">API 用量</h1>
@@ -1222,7 +1222,7 @@ function ApiUsageView() {
           {recentCalls.length > 0 && (
             <Card>
               <h3 className="text-sm font-semibold text-zinc-200 mb-3">最近调用</h3>
-              <div className="space-y-1 max-h-60 overflow-y-auto">
+              <div className="space-y-1 max-h-60 overflow-y-auto overflow-x-hidden">
                 {recentCalls.slice(0, 30).map((c, i) => (
                   <div key={i} className="flex items-center gap-3 text-[11px] py-1.5 border-b border-border/30 last:border-0">
                     <span className={`w-1.5 h-1.5 rounded-full ${c.success !== false ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>

@@ -48,7 +48,7 @@ function TradeTable({trades, title, colorFn}) {
     <div>
       <h4 className="text-[11px] font-medium text-zinc-400 mb-2">{title}</h4>
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-[10px] md:text-[11px]">
+        <table className="w-full min-w-0 text-[10px] md:text-[11px]">
           <thead><tr className="bg-surface-3 text-zinc-500">
             <th className="px-2 py-1.5 text-left font-medium">股票</th>
             <th className="px-2 py-1.5 text-left font-medium">买入日</th>
@@ -149,7 +149,7 @@ function TopStocksTable({stocks}) {
     <Card>
       <h4 className="text-[12px] font-semibold text-zinc-300 mb-2">高频交易股票 TOP {stocks.length}</h4>
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-[10px] md:text-[11px]">
+        <table className="w-full min-w-0 text-[10px] md:text-[11px]">
           <thead><tr className="bg-surface-3 text-zinc-500">
             <th className="px-2.5 py-1.5 text-left font-medium">股票代码</th>
             <th className="px-2.5 py-1.5 text-right font-medium">交易次数</th>
@@ -614,7 +614,7 @@ function QuantView() {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">量化策略研发</h1>
@@ -642,7 +642,7 @@ function QuantView() {
 
       {tab === 'records' && (
         <div className="grid lg:grid-cols-[320px_1fr] gap-4" style={{minHeight:'600px'}}>
-          <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
+          <div className="space-y-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-220px)] pr-1">
             {recordsLoading && <LoadingBlock text="加载记录..." />}
             {!recordsLoading && records.length === 0 && <Card><div className="text-center py-8 text-zinc-600 text-sm"><div className="text-3xl mb-2">📊</div>暂无挖掘记录<br/><span className="text-zinc-700">去「启动研发」开始第一次量化挖掘</span></div></Card>}
             {records.map(r => (
@@ -668,7 +668,7 @@ function QuantView() {
               </div>
             ))}
           </div>
-          <div className="overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
+          <div className="overflow-y-auto overflow-x-hidden max-h-[calc(100vh-220px)] pr-1">
             {!selectedId && !detailLoading && <Card><div className="text-center py-16 text-zinc-600"><div className="text-4xl mb-3">👈</div><div className="text-sm">选择左侧记录查看完整挖掘数据</div><div className="text-[11px] text-zinc-700 mt-1">包含指标、交易记录、每日活动、盈亏分布等全量数据</div></div></Card>}
             {detailLoading && <Card><LoadingBlock text="加载完整数据..." /></Card>}
             {selectedDetail && !selectedDetail._type && !detailLoading && <RecordFullDetail rec={selectedDetail} toast={toast} onOptimize={handleOptimizeFromRecord} />}
@@ -842,8 +842,8 @@ function QuantView() {
                         <button onClick={()=>setScreenResult(null)} className="text-[10px] text-zinc-500 hover:text-zinc-400">✕</button>
                       </div>
                     </div>
-                    <div className="overflow-x-auto rounded-lg border border-border max-h-[300px] overflow-y-auto">
-                      <table className="w-full text-[10px] md:text-[11px]">
+                    <div className="overflow-x-auto rounded-lg border border-border max-h-[300px] overflow-y-auto overflow-x-hidden">
+                      <table className="w-full min-w-0 text-[10px] md:text-[11px]">
                         <thead className="sticky top-0"><tr className="bg-surface-3 text-zinc-500">
                           <th className="px-2 py-1.5 text-left font-medium">代码</th>
                           <th className="px-2 py-1.5 text-left font-medium">名称</th>
@@ -967,7 +967,7 @@ function QuantView() {
               <Card>
                 <div className="text-[11px] text-zinc-500 mb-2">显示 {filtered.length} / {factorList.length} 个因子</div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[12px]">
+                  <table className="w-full min-w-0 text-[12px]">
                     <thead>
                       <tr className="text-zinc-500 border-b border-border/30">
                         <th className="py-2 px-1 w-6"><input type="checkbox" checked={selectedForCombine.length>0 && selectedForCombine.length===filtered.filter(f=>f.status==='active').length} onChange={e=>{ if(e.target.checked) setSelectedForCombine(filtered.filter(f=>f.status==='active').map(f=>f.id)); else setSelectedForCombine([]); }} className="accent-brand-500" /></th>
@@ -1085,7 +1085,7 @@ function QuantView() {
                       </div>
                     </div>
                     <div className="bg-[#0d1117] rounded-xl border border-border/30 overflow-hidden">
-                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto p-4">
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto overflow-x-hidden p-4">
                         <pre className="text-[12px] leading-relaxed font-mono whitespace-pre">{(selectedFactor.code||'(代码不可用)').split('\n').map((line,i)=>(
                           <div key={i} className="flex"><span className="select-none text-zinc-700 w-8 text-right mr-3 flex-shrink-0">{i+1}</span><span className={line.trim().startsWith('#')?'text-zinc-600':line.trim().startsWith('def ')?'text-amber-400':line.trim().startsWith('import ')?'text-cyan-400/70':line.trim().startsWith('return ')?'text-rose-400':'text-emerald-300/90'}>{line}</span></div>
                         ))}</pre>
@@ -1232,7 +1232,7 @@ top_stocks = factor.iloc[-1].nlargest(20)  # 今日 Top 20`}</pre>
                       降维聚类 — {analysisData.clusters.combinable_factors} 可融合因子 → {analysisData.clusters.total} 独立聚类
                     </h4>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-[10px] md:text-[11px]">
+                      <table className="w-full min-w-0 text-[10px] md:text-[11px]">
                         <thead><tr className="text-zinc-500 border-b border-border/30">
                           <th className="py-1.5 px-2 text-left">#</th>
                           <th className="py-1.5 px-2 text-left">代表因子</th>
@@ -1368,8 +1368,8 @@ top_stocks = factor.iloc[-1].nlargest(20)  # 今日 Top 20`}</pre>
             {exhaustiveResults.length > 0 && (
               <Card>
                 <h4 className="text-[12px] font-semibold text-zinc-300 mb-2">组合结果 ({exhaustiveResults.length})</h4>
-                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                  <table className="w-full text-[10px] md:text-[11px]">
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto overflow-x-hidden">
+                  <table className="w-full min-w-0 text-[10px] md:text-[11px]">
                     <thead><tr className="text-zinc-500 border-b border-border/30 sticky top-0 bg-surface-1">
                       <th className="py-1.5 px-2 text-left">#</th>
                       <th className="py-1.5 px-2 text-left">因子组合</th>
@@ -1611,7 +1611,7 @@ top_stocks = factor.iloc[-1].nlargest(20)  # 今日 Top 20`}</pre>
                     <div className="mb-4">
                       <h5 className="text-[11px] font-semibold text-zinc-400 mb-2">输入因子 ({rec.input_factors.length})</h5>
                       <div className="overflow-x-auto">
-                        <table className="w-full text-[10px]">
+                        <table className="w-full min-w-0 text-[10px]">
                           <thead><tr className="text-zinc-500 border-b border-border/20">
                             <th className="text-left py-1 px-2">ID</th><th className="text-left py-1 px-2">主题</th>
                             <th className="text-right py-1 px-2">Sharpe</th><th className="text-right py-1 px-2">IR</th>
@@ -1637,7 +1637,7 @@ top_stocks = factor.iloc[-1].nlargest(20)  # 今日 Top 20`}</pre>
                   {rec.combined_code_preview && (
                     <div>
                       <h5 className="text-[11px] font-semibold text-zinc-400 mb-2">融合代码 (前2000字符)</h5>
-                      <div className="bg-[#0d1117] rounded-xl p-3 border border-border/30 overflow-x-auto max-h-[300px] overflow-y-auto">
+                      <div className="bg-[#0d1117] rounded-xl p-3 border border-border/30 overflow-x-auto max-h-[300px] overflow-y-auto overflow-x-hidden">
                         <pre className="text-[11px] leading-relaxed text-emerald-300/80 font-mono whitespace-pre">{rec.combined_code_preview}</pre>
                       </div>
                     </div>
@@ -1647,7 +1647,7 @@ top_stocks = factor.iloc[-1].nlargest(20)  # 今日 Top 20`}</pre>
                   {rec.result_raw && (
                     <details className="mt-3">
                       <summary className="text-[10px] text-zinc-500 cursor-pointer hover:text-zinc-400">展开原始结果</summary>
-                      <div className="bg-[#0d1117] rounded-xl p-3 mt-1 border border-border/30 overflow-x-auto max-h-[200px] overflow-y-auto">
+                      <div className="bg-[#0d1117] rounded-xl p-3 mt-1 border border-border/30 overflow-x-auto max-h-[200px] overflow-y-auto overflow-x-hidden">
                         <pre className="text-[10px] text-zinc-500 font-mono whitespace-pre-wrap">{rec.result_raw}</pre>
                       </div>
                     </details>
@@ -1693,7 +1693,7 @@ top_stocks = factor.iloc[-1].nlargest(20)  # 今日 Top 20`}</pre>
                   <h3 className="text-sm font-semibold text-zinc-300">📋 挖掘日志 <span className="text-zinc-600 font-normal">({diggerLogs.length} 条)</span></h3>
                   {!diggerRunning && <button onClick={() => setDiggerLogs([])} className="btn text-[11px] text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded-lg transition">清空</button>}
                 </div>
-                <div className="space-y-1.5 max-h-[600px] overflow-y-auto">
+                <div className="space-y-1.5 max-h-[600px] overflow-y-auto overflow-x-hidden">
                   {diggerLogs.map((log, i) => (
                     <div key={i} className={`text-[12px] leading-relaxed px-3 py-2 rounded-lg border-l-2 transition-all
                       ${log.type === 'success' ? 'border-emerald-500/40 bg-emerald-600/5 text-emerald-300' :
@@ -1823,14 +1823,14 @@ function DailyLogView() {
   const roleColor = (role) => ({user:'text-blue-400', assistant:'text-green-400', command:'text-yellow-400', result:'text-zinc-400'}[role] || 'text-zinc-300');
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 animate-fade-in">
       <div className="flex items-center justify-between mb-4"><h1 className="text-xl font-bold text-white">每日工作日志</h1><button onClick={loadDates} className="btn text-[12px] text-brand-400 hover:text-brand-300 px-3 py-1.5 rounded-lg transition">刷新日期</button></div>
       <div className="flex gap-2 mb-4 flex-wrap">{dates.length === 0 && <span className="text-[12px] text-zinc-500">暂无日志记录</span>}{dates.map(d => (<button key={d} onClick={() => loadLog(d)} className={`btn px-3 py-1.5 rounded-xl text-[12px] border transition ${d === selectedDate ? 'bg-brand-600/20 text-brand-400 border-brand-500/30' : 'bg-surface-2 text-zinc-400 border-border hover:border-border-light'}`}>{d}</button>))}</div>
       {loading && (<Card><div className="flex items-center gap-2 py-4 justify-center"><Spinner /> <span className="text-zinc-500 text-sm">加载中...</span></div></Card>)}
       {!loading && log && (<div className="space-y-4">
         <div className="grid grid-cols-2 gap-3"><Card><div className="text-center"><div className="text-2xl font-bold text-brand-400">{log.chat_count || 0}</div><div className="text-[11px] text-zinc-500 mt-1">对话记录</div></div></Card><Card><div className="text-center"><div className="text-2xl font-bold text-emerald-400">{log.task_count || 0}</div><div className="text-[11px] text-zinc-500 mt-1">任务执行</div></div></Card></div>
         {log.tasks && log.tasks.length > 0 && (<Card><h3 className="text-sm font-semibold text-zinc-300 mb-3">📋 当日任务</h3><div className="space-y-2">{log.tasks.map((t, i) => { const icon = {completed:'✅', running:'🔄', failed:'❌', pending:'⏳', cancelled:'🚫'}[t.status] || '❓'; return (<div key={i} className="flex items-center gap-2 text-[13px] py-1.5 border-b border-border/50 last:border-0"><span>{icon}</span><span className="text-zinc-300 font-medium">{t.name || t.id}</span><span className="text-zinc-600 ml-auto">{t.progress != null ? t.progress + '%' : ''}</span></div>); })}</div></Card>)}
-        {log.chats && log.chats.length > 0 && (<Card><h3 className="text-sm font-semibold text-zinc-300 mb-3">💬 对话与操作记录</h3><div className="space-y-1 max-h-[600px] overflow-y-auto">{log.chats.map((c, i) => (<div key={i} className="flex gap-2 py-1.5 border-b border-border/30 last:border-0"><span className="text-[13px] flex-shrink-0">{roleIcon(c.role)}</span><div className="flex-1 min-w-0"><span className={`text-[12px] font-medium ${roleColor(c.role)}`}>{c.role}</span><span className="text-[11px] text-zinc-600 ml-2">{fmtTime(c.ts)}</span>{c.view && c.view !== 'chat' && <span className="text-[10px] text-zinc-700 ml-1 px-1.5 py-0.5 bg-surface-3 rounded">{c.view}</span>}<pre className="text-[12px] text-zinc-400 mt-0.5 whitespace-pre-wrap break-all leading-relaxed">{(c.content||'').slice(0, 500)}{(c.content||'').length > 500 ? '...' : ''}</pre></div></div>))}</div></Card>)}
+        {log.chats && log.chats.length > 0 && (<Card><h3 className="text-sm font-semibold text-zinc-300 mb-3">💬 对话与操作记录</h3><div className="space-y-1 max-h-[600px] overflow-y-auto overflow-x-hidden">{log.chats.map((c, i) => (<div key={i} className="flex gap-2 py-1.5 border-b border-border/30 last:border-0"><span className="text-[13px] flex-shrink-0">{roleIcon(c.role)}</span><div className="flex-1 min-w-0"><span className={`text-[12px] font-medium ${roleColor(c.role)}`}>{c.role}</span><span className="text-[11px] text-zinc-600 ml-2">{fmtTime(c.ts)}</span>{c.view && c.view !== 'chat' && <span className="text-[10px] text-zinc-700 ml-1 px-1.5 py-0.5 bg-surface-3 rounded">{c.view}</span>}<pre className="text-[12px] text-zinc-400 mt-0.5 whitespace-pre-wrap break-all leading-relaxed">{(c.content||'').slice(0, 500)}{(c.content||'').length > 500 ? '...' : ''}</pre></div></div>))}</div></Card>)}
         {(!log.chats || log.chats.length === 0) && (!log.tasks || log.tasks.length === 0) && (<Card><div className="text-center py-8 text-zinc-600 text-sm">当日无操作记录</div></Card>)}
       </div>)}
     </div>

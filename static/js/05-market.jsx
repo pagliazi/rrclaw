@@ -69,7 +69,7 @@ function MarketView() {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-4 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">行情总览</h1>
@@ -123,7 +123,7 @@ function MarketView() {
             <h3 className="text-sm font-semibold text-zinc-200 mb-3">🔴 涨停板 ({stats.zt_count || 0} 只)</h3>
             {ztList.length === 0 ? <div className="text-zinc-600 text-sm py-4 text-center">暂无涨停数据</div> : (
               <div className="overflow-x-auto">
-                <table className="w-full text-[12px]">
+                <table className="w-full min-w-0 text-[12px]">
                   <thead><tr className="text-zinc-500 border-b border-border/50">
                     <th className="text-left py-2 px-1 w-8">#</th>
                     <th className="text-left py-2 px-1">名称</th>
@@ -159,7 +159,7 @@ function MarketView() {
             <h3 className="text-sm font-semibold text-zinc-200 mb-3">🔗 连板股</h3>
             {lbList.length === 0 ? <div className="text-zinc-600 text-sm py-4 text-center">暂无连板数据</div> : (
               <div className="overflow-x-auto">
-                <table className="w-full text-[12px]">
+                <table className="w-full min-w-0 text-[12px]">
                   <thead><tr className="text-zinc-500 border-b border-border/50">
                     <th className="text-left py-2 px-1 w-8">#</th>
                     <th className="text-left py-2 px-1">名称</th>
@@ -189,7 +189,7 @@ function MarketView() {
             <h3 className="text-sm font-semibold text-zinc-200 mb-3">🏷️ 概念板块涨幅榜</h3>
             {bkList.length === 0 ? <div className="text-zinc-600 text-sm py-4 text-center">暂无板块数据</div> : (
               <div className="overflow-x-auto">
-                <table className="w-full text-[12px]">
+                <table className="w-full min-w-0 text-[12px]">
                   <thead><tr className="text-zinc-500 border-b border-border/50">
                     <th className="text-left py-2 px-1 w-8">#</th>
                     <th className="text-left py-2 px-1">板块</th>
@@ -219,7 +219,7 @@ function MarketView() {
             <h3 className="text-sm font-semibold text-zinc-200 mb-3">🔥 同花顺热股</h3>
             {hotList.length === 0 ? <div className="text-zinc-600 text-sm py-4 text-center">暂无热股数据</div> : (
               <div className="overflow-x-auto">
-                <table className="w-full text-[12px]">
+                <table className="w-full min-w-0 text-[12px]">
                   <thead><tr className="text-zinc-500 border-b border-border/50">
                     <th className="text-center py-2 px-1 w-10">排名</th>
                     <th className="text-left py-2 px-1">名称</th>
@@ -411,7 +411,7 @@ function TasksView() {
   const finished = tasks.filter(t => t.status !== 'running' && t.status !== 'pending');
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 animate-fade-in">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold text-white">多任务管理</h1>
@@ -432,7 +432,7 @@ function TasksView() {
             <div key={t.id}>
               <TaskCard task={t} onCancel={cancelTask} onRefresh={refresh} expanded={expandedId===t.id} onToggle={()=>setExpandedId(expandedId===t.id?'':t.id)} />
               {progressLog[t.id] && expandedId===t.id && (
-                <div className="mt-1 ml-6 space-y-0.5 text-[10px] text-zinc-500 font-mono max-h-24 overflow-y-auto">
+                <div className="mt-1 ml-6 space-y-0.5 text-[10px] text-zinc-500 font-mono max-h-24 overflow-y-auto overflow-x-hidden">
                   {progressLog[t.id].map((l,i) => <div key={i}>{l}</div>)}
                 </div>
               )}
@@ -486,7 +486,7 @@ function IntradayView() {
   const scans = status?.recent_scans || [];
 
   return (
-    <div className="flex-1 h-full overflow-y-auto p-6 space-y-6 animate-fade-in">
+    <div className="flex-1 h-full overflow-y-auto overflow-x-hidden p-6 space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-zinc-100 flex items-center gap-2"><span className="text-2xl">⏱️</span> 盘中实时监控</h2>
