@@ -38,7 +38,7 @@ const ROLE_COLORS = {admin:'text-rose-400', user:'text-brand-400', viewer:'text-
 
 // ── Agent Metadata (known agents, fallback for unknown) ──
 const AGENT_META = {
-  orchestrator:{icon:'🧠',label:'RRCLAW',desc:'ConversationRuntime 核心引擎',cat:'core'},
+  orchestrator:{icon:'🧠',label:'RRAgent',desc:'ConversationRuntime 核心引擎',cat:'core'},
   general:{icon:'🧠',label:'通用助手',desc:'知识问答 · 翻译写作',cat:'core'},
   market:{icon:'📊',label:'行情',desc:'实时行情数据',cat:'quant'},
   analysis:{icon:'🔬',label:'分析师',desc:'市场深度分析',cat:'quant'},

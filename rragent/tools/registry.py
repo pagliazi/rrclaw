@@ -40,7 +40,7 @@ class ToolIndex:
 
 class GlobalToolRegistry:
     """
-    Central registry for all RRCLAW tools.
+    Central registry for all RRAgent tools.
 
     Tools are organized in tiers:
     - tier0: Tool instances, always available

@@ -129,7 +129,7 @@ async def handle_user_message(session_id: str, text: str):
 async def main():
     global pyagent_bridge, registry, executor, llm, gateway, config, context_engine
 
-    logger.info("=== RRCLAW P1 启动 (ToolSearch + Context Engineering) ===")
+    logger.info("=== RRAgent P1 启动 (ToolSearch + Context Engineering) ===")
 
     # 0. Load config
     config = RRClawConfig.from_file()
@@ -187,7 +187,7 @@ async def main():
         logger.info("No GATEWAY_TOKEN — running standalone (stdin mode)")
 
     # 7. Stdin mode (for testing)
-    logger.info("\n=== RRCLAW P1 Ready. Type messages below (Ctrl+C to quit) ===\n")
+    logger.info("\n=== RRAgent P1 Ready. Type messages below (Ctrl+C to quit) ===\n")
 
     loop = asyncio.get_event_loop()
     try:

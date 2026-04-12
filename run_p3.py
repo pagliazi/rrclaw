@@ -317,7 +317,7 @@ async def main():
     global evolve_command, research_command
     global acp_runtime
 
-    logger.info("=== RRCLAW P3 启动 (Self-Learning) ===")
+    logger.info("=== RRAgent P3 启动 (Self-Learning) ===")
 
     # 0. Load config
     config = RRClawConfig.from_file()
@@ -529,13 +529,13 @@ async def main():
     redis_mode = os.getenv("RRAGENT_REDIS_MODE", "").lower() == "true"
 
     if redis_mode and pyagent_bridge and pyagent_bridge.is_connected:
-        # --- RRCLAW 替代 orchestrator：直接订阅 Redis 频道处理 IM 消息 ---
+        # --- RRAgent 替代 orchestrator：直接订阅 Redis 频道处理 IM 消息 ---
         import redis.asyncio as aioredis
         listen_channel = os.getenv("RRAGENT_LISTEN_CHANNEL", "openclaw:orchestrator")
         r = aioredis.from_url(REDIS_URL, decode_responses=True)
         pubsub = r.pubsub()
         await pubsub.subscribe(listen_channel)
-        logger.info(f"\n=== RRCLAW running in Redis mode (subscribed to {listen_channel}) ===\n")
+        logger.info(f"\n=== RRAgent running in Redis mode (subscribed to {listen_channel}) ===\n")
 
         async def _handle_redis_message(raw_data):
             try:
@@ -552,7 +552,7 @@ async def main():
                 # Send progress
                 if reply_channel:
                     await r.publish(reply_channel, json.dumps({
-                        "type": "progress", "text": "🤖 RRCLAW 正在处理...",
+                        "type": "progress", "text": "🤖 RRAgent 正在处理...",
                         "in_reply_to": msg_id,
                     }, ensure_ascii=False))
 
@@ -600,7 +600,7 @@ async def main():
                 logger.error(f"Redis message error: {e}", exc_info=True)
                 if reply_channel:
                     await r.publish(reply_channel, json.dumps({
-                        "type": "done", "text": f"❌ RRCLAW 错误: {e}",
+                        "type": "done", "text": f"❌ RRAgent 错误: {e}",
                         "in_reply_to": msg_id,
                     }, ensure_ascii=False))
 
@@ -616,13 +616,13 @@ async def main():
             await r.aclose()
 
     elif GATEWAY_TOKEN and gateway and gateway.is_connected:
-        logger.info("\n=== RRCLAW running in Gateway mode (listening for IM messages) ===\n")
+        logger.info("\n=== RRAgent running in Gateway mode (listening for IM messages) ===\n")
         try:
             await gateway.listen()
         except (KeyboardInterrupt, asyncio.CancelledError):
             pass
     else:
-        logger.info("\n=== RRCLAW P3 Ready. Type messages below (Ctrl+C to quit) ===\n")
+        logger.info("\n=== RRAgent P3 Ready. Type messages below (Ctrl+C to quit) ===\n")
         loop = asyncio.get_event_loop()
         try:
             while True:

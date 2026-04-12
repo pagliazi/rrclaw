@@ -1,6 +1,6 @@
 <div align="center">
 
-# RRCLAW
+# RRAgent
 
 **A股量化智能体框架 / A-Share Quant Trading Agent**
 
@@ -9,7 +9,7 @@
 [![LLM](https://img.shields.io/badge/LLM-Claude%20%7C%20Qwen-purple.svg)](https://anthropic.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-*RRCLAW 是基于 LLM 的 A 股量化交易框架，支持实时行情分析、策略回测、因子挖掘与多条件选股。<br>对接 [ReachRich](https://rr.zayl.net) 数据平台，覆盖沪深京 5000+ 标的。*
+*RRAgent 是基于 LLM 的 A 股量化交易框架，支持实时行情分析、策略回测、因子挖掘与多条件选股。<br>对接 [ReachRich](https://rr.zayl.net) 数据平台，覆盖沪深京 5000+ 标的。*
 
 </div>
 
@@ -32,7 +32,7 @@
 
 ```bash
 git clone https://github.com/pagliazi/rrclaw.git
-cd rrclaw
+cd rragent
 
 # 一键部署
 ./deploy.sh
@@ -41,7 +41,7 @@ cd rrclaw
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env       # 填入 API Key
-cp config.example.yaml rrclaw.yaml
+cp config.example.yaml rragent.yaml
 ```
 
 配置 `.env`：
@@ -56,7 +56,7 @@ REDIS_URL=redis://127.0.0.1:6379/0
 启动：
 
 ```bash
-python -m rrclaw --config rrclaw.yaml
+python -m rragent --config rragent.yaml
 ```
 
 ## Architecture
@@ -67,7 +67,7 @@ python -m rrclaw --config rrclaw.yaml
 └──────────────┬──────────────────────────────────────┘
                │ WebSocket / ACP
 ┌──────────────▼──────────────────────────────────────┐
-│  RRCLAW (Python, ~10,800 lines)                      │
+│  RRAgent (Python, ~10,800 lines)                      │
 │                                                      │
 │  ConversationRuntime ── LLM 推理循环                  │
 │  ├── ContextEngine ─── 上下文压缩                     │
@@ -80,7 +80,7 @@ python -m rrclaw --config rrclaw.yaml
 └──────────────────────────────────────────────────────┘
 ```
 
-RRCLAW 负责 LLM 推理主循环：接收指令 → 调度工具获取数据 → 执行回测 → 返回结果。定位是量化系统的决策调度层。
+RRAgent 负责 LLM 推理主循环：接收指令 → 调度工具获取数据 → 执行回测 → 返回结果。定位是量化系统的决策调度层。
 
 ## Usage
 
@@ -133,23 +133,23 @@ r = httpx.post("https://rr.zayl.net/api/bridge/screener/", headers=headers, json
 cd deploy/ && docker compose up -d
 
 # Linux (systemd)
-sudo cp -r . /opt/rrclaw
-cd /opt/rrclaw && python3 -m venv .venv && .venv/bin/pip install -e .
-sudo cp deploy/hermes-bridge.service /etc/systemd/system/rrclaw.service
-sudo systemctl enable --now rrclaw
+sudo cp -r . /opt/rragent
+cd /opt/rragent && python3 -m venv .venv && .venv/bin/pip install -e .
+sudo cp deploy/hermes-bridge.service /etc/systemd/system/rragent.service
+sudo systemctl enable --now rragent
 
 # macOS (launchd)
-cp deploy/com.hermes-bridge.plist ~/Library/LaunchAgents/com.rrclaw.plist
-launchctl load ~/Library/LaunchAgents/com.rrclaw.plist
+cp deploy/com.hermes-bridge.plist ~/Library/LaunchAgents/com.rragent.plist
+launchctl load ~/Library/LaunchAgents/com.rragent.plist
 ```
 
 ## FAQ
 
 **如何获取 API Key？** — [rr.zayl.net](https://rr.zayl.net) 注册登录 → 设置 → API Key → 生成
 
-**切换 LLM？** — 设置 `RRCLAW_PRIMARY_MODEL=dashscope/qwen3.5-plus` 或 `ollama/qwen2.5-coder:14b`
+**切换 LLM？** — 设置 `RRAGENT_PRIMARY_MODEL=dashscope/qwen3.5-plus` 或 `ollama/qwen2.5-coder:14b`
 
-**不接 IM 只用数据？** — 跳过 Gateway，直接 HTTP 调 API 或启动 `rrclaw-market` MCP 服务
+**不接 IM 只用数据？** — 跳过 Gateway，直接 HTTP 调 API 或启动 `rragent-market` MCP 服务
 
 ## License
 

@@ -1,7 +1,7 @@
 """
 PyAgent Redis Bridge — native tool calls to 12 Python agents via Redis Pub/Sub.
 
-Replaces the old bridge translation layer. RRCLAW now directly controls
+Replaces the old bridge translation layer. RRAgent now directly controls
 routing to PyAgent commands through Redis, with proper timeout handling
 and error containment.
 """

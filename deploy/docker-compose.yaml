@@ -10,7 +10,7 @@ services:
     command: redis-server --appendonly yes
     restart: unless-stopped
 
-  rrclaw:
+  rragent:
     build:
       context: ..
       dockerfile: deploy/Dockerfile

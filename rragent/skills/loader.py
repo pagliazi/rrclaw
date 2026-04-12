@@ -54,7 +54,7 @@ class SkillLoader:
     Load skills from directories.
 
     Scans:
-    1. Bundled skills: rrclaw/skills/bundled/
+    1. Bundled skills: rragent/skills/bundled/
     2. User skills: ~/.rragent/skills/
     3. Workspace skills: ~/.rragent/workspace/skills/
 

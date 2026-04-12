@@ -28,7 +28,7 @@ Data flow:
         → data_factory.redis_client.publish() / BridgePublisher.publish()
             → Redis PUBLISH reachrich:realtime:quotes
                 → FastAPI SSE/WebSocket (browser clients)
-                → RRCLAW StreamConsumer (AI agent) — this module
+                → RRAgent StreamConsumer (AI agent) — this module
                     → handlers (ConversationRuntime / Evolution Engine)
 
 Publisher stack:

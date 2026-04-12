@@ -1,5 +1,5 @@
-# RRCLAW Harness Configuration
-# Copy to rrclaw.yaml and customize for your environment.
+# RRAgent Harness Configuration
+# Copy to rragent.yaml and customize for your environment.
 # Environment variables override YAML values (see README).
 
 # ── OpenClaw Gateway ──
@@ -13,7 +13,7 @@ gateway:
   auth_token: ""
 
   # Agent ID registered in Gateway
-  agent_id: "rrclaw"
+  agent_id: "rragent"
 
 # ── LLM Providers ──
 providers:
@@ -63,7 +63,7 @@ context:
 # ── Session Persistence ──
 session:
   # Directory for JSONL session files
-  dir: "~/.rrclaw/sessions"
+  dir: "~/.rragent/sessions"
 
   # Auto-rotate session file at this size (bytes)
   rotation_size: 262144  # 256KB
@@ -75,7 +75,7 @@ resilience:
 
 # ── Skills ──
 skills:
-  # Auto-sync skills between RRCLAW, OpenClaw, Hermes
+  # Auto-sync skills between RRAgent, OpenClaw, Hermes
   auto_sync: true
 
   # Sync interval in hours

@@ -1,5 +1,5 @@
 """
-端到端用户流程测试 — 模拟真实用户通过 RRCLAW 查询行情和调用策略选股。
+端到端用户流程测试 — 模拟真实用户通过 RRAgent 查询行情和调用策略选股。
 
 测试两条核心路径：
   Path 1: MCP Server → BridgeClient → ReachRich API（行情查询）
@@ -545,11 +545,11 @@ async def test_scenario_2_strategy_screening():
 async def test_scenario_3_realtime_stream():
     """场景3: 实时数据流推送
 
-    模拟 data_factory Celery Worker 发布数据 → RRCLAW StreamConsumer 接收。
+    模拟 data_factory Celery Worker 发布数据 → RRAgent StreamConsumer 接收。
     """
     print("=" * 60)
     print("场景3: 实时数据流推送")
-    print("  模拟: data_factory → Redis Pub/Sub → RRCLAW StreamConsumer")
+    print("  模拟: data_factory → Redis Pub/Sub → RRAgent StreamConsumer")
     print("=" * 60)
 
     from rragent.data_sources.reachrich_stream import (
@@ -651,11 +651,11 @@ async def test_scenario_3_realtime_stream():
 async def test_scenario_4_mcp_protocol():
     """场景4: 完整 MCP JSON-RPC 协议测试
 
-    模拟 MCP 客户端（如 Claude Desktop）通过标准协议调用 RRCLAW 工具。
+    模拟 MCP 客户端（如 Claude Desktop）通过标准协议调用 RRAgent 工具。
     """
     print("=" * 60)
     print("场景4: MCP JSON-RPC 协议")
-    print("  模拟: Claude Desktop → MCP JSON-RPC → RRCLAW MCP Server")
+    print("  模拟: Claude Desktop → MCP JSON-RPC → RRAgent MCP Server")
     print("=" * 60)
 
     from rragent.tools.mcp.reachrich_server import ReachRichMCPServer
@@ -669,7 +669,7 @@ async def test_scenario_4_mcp_protocol():
         "jsonrpc": "2.0", "id": 1, "method": "initialize",
         "params": {"protocolVersion": "2024-11-05"},
     })
-    assert resp["result"]["serverInfo"]["name"] == "rrclaw-market"
+    assert resp["result"]["serverInfo"]["name"] == "rragent-market"
     print(f"  ✓ Server: {resp['result']['serverInfo']['name']} "
           f"v{resp['result']['serverInfo']['version']}")
 
@@ -768,13 +768,13 @@ async def test_scenario_5_full_user_session():
     print("\n[Turn 1] 用户: 今天大盘怎么样？")
     r = await server._call_tool("market_snapshot", {})
     snap = json.loads(r["content"][0]["text"])
-    print(f"  RRCLAW: 大盘偏多，{snap['up_count']}涨/{snap['down_count']}跌，"
+    print(f"  RRAgent: 大盘偏多，{snap['up_count']}涨/{snap['down_count']}跌，"
           f"涨停{snap['limit_up']}只")
 
     r = await server._call_tool("market_concepts", {"limit": 5})
     concepts = json.loads(r["content"][0]["text"])
     top = concepts["data"][0]
-    print(f"  RRCLAW: 板块龙头是{top['name']}(+{top['change_pct']}%)，"
+    print(f"  RRAgent: 板块龙头是{top['name']}(+{top['change_pct']}%)，"
           f"涨停{top['limit_up_count']}只")
 
     # 同时收到实时推送
@@ -793,14 +793,14 @@ async def test_scenario_5_full_user_session():
     r = await server._call_tool("market_presets", {})
     presets = json.loads(r["content"][0]["text"])["presets"]
     semi_preset = next(p for p in presets if "半导体" in p["name"])
-    print(f"  RRCLAW: 找到策略「{semi_preset['name']}」，正在运行...")
+    print(f"  RRAgent: 找到策略「{semi_preset['name']}」，正在运行...")
 
     r = await server._call_tool("market_screener", {
         "payload": {"preset_id": semi_preset["id"], "conditions": semi_preset["conditions"]},
         "limit": 10,
     })
     picks = json.loads(r["content"][0]["text"])
-    print(f"  RRCLAW: 选出 {picks['result_count']} 只:")
+    print(f"  RRAgent: 选出 {picks['result_count']} 只:")
     for i, s in enumerate(picks["data"][:3], 1):
         print(f"    {i}. {s['name']}({s['ts_code']}) "
               f"¥{s['close']} {s['pct_chg']:+.1f}% 评分{s['score']}")
@@ -828,7 +828,7 @@ async def test_scenario_5_full_user_session():
     })
     ind = json.loads(r["content"][0]["text"])["data"]
 
-    print(f"  RRCLAW: {top_pick['name']}分析:")
+    print(f"  RRAgent: {top_pick['name']}分析:")
     print(f"    K线: 近5日连涨，今日涨停")
     print(f"    均线: MA5({ind['ma5']}) > MA20({ind['ma20']}) 多头排列")
     print(f"    RSI14={ind['rsi_14']} 偏高但未超买")

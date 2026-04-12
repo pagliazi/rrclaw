@@ -29,7 +29,7 @@ function LoginPage({onLogin}) {
           <div className="w-16 h-16 mx-auto rounded-2xl bg-brand-600/15 border border-brand-500/20 flex items-center justify-center mb-5 shadow-lg shadow-brand-600/10">
             <span className="text-3xl">📊</span>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">RRCLAW</h1>
+          <h1 className="text-2xl font-bold text-white tracking-tight">RRAgent</h1>
           <p className="text-sm text-zinc-500 mt-1.5">A股量化智能体</p>
         </div>
         <form onSubmit={handleSubmit} className="glass rounded-2xl p-6 space-y-4 shadow-2xl shadow-black/30 gradient-border">
@@ -50,7 +50,7 @@ function LoginPage({onLogin}) {
             {loading ? <span className="flex items-center justify-center gap-2"><Spinner size={4} /> 登录中...</span> : '登 录'}
           </button>
         </form>
-        <p className="text-center text-[11px] text-zinc-700 mt-6">RRCLAW Multi-Agent System · v2.0</p>
+        <p className="text-center text-[11px] text-zinc-700 mt-6">RRAgent Multi-Agent System · v2.0</p>
       </div>
     </div>
   );
@@ -179,7 +179,7 @@ function NavRail({currentView, onViewChange, agents, user, onLogout, splitView, 
           onClick={()=>onViewChange('dashboard')}>
           <span className="text-base">📊</span>
         </div>
-        {!collapsed && <span className="text-xs font-bold text-brand-400 tracking-wide">RRCLAW</span>}
+        {!collapsed && <span className="text-xs font-bold text-brand-400 tracking-wide">RRAgent</span>}
         <button onClick={()=>setCollapsed(!collapsed)}
           className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-zinc-400 transition-all duration-200 rounded-lg hover:bg-surface-2 flex-shrink-0">
           {collapseBtn}

@@ -1,5 +1,5 @@
 """
-RRCLAW Unified Server — replaces webchat_api.py entirely.
+RRAgent Unified Server — replaces webchat_api.py entirely.
 
 Combines:
 - Chat API (SSE streaming via ConversationRuntime)
@@ -47,7 +47,7 @@ BRAIN_PATH = os.getenv("BRAIN_PATH", os.path.expanduser("~/OpenClaw-Universe/ope
 REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 PORT = int(os.getenv("RRAGENT_PORT", "7789"))
 HOST = os.getenv("RRAGENT_HOST", "0.0.0.0")
-JWT_SECRET = os.getenv("JWT_SECRET", "rrclaw-secret")
+JWT_SECRET = os.getenv("JWT_SECRET", "rragent-secret")
 JWT_EXPIRE = int(os.getenv("JWT_EXPIRE", "86400"))
 AUTH_USER = os.getenv("WEBCHAT_AUTH_USER", "")
 AUTH_PASS = os.getenv("WEBCHAT_AUTH_PASS", "")
@@ -74,7 +74,7 @@ LONG_RUNNING_CMDS = {"quant", "quant_optimize", "backtest", "intraday_select", "
 
 _redis: aioredis.Redis | None = None
 
-# RRCLAW runtime components
+# RRAgent runtime components
 from rragent.runtime.conversation import ConversationRuntime, TurnConfig, EventType
 from rragent.runtime.session import Session
 from rragent.runtime.config import RRClawConfig
@@ -392,10 +392,10 @@ def build_provider_router() -> ProviderRouter:
     return ProviderRouter(configs)
 
 
-# ── RRCLAW Runtime Init ─────────────────────────────────
+# ── RRAgent Runtime Init ─────────────────────────────────
 
-async def init_rrclaw():
-    """Initialize all RRCLAW runtime components (called during FastAPI lifespan)."""
+async def init_rragent():
+    """Initialize all RRAgent runtime components (called during FastAPI lifespan)."""
     global pyagent_bridge, registry, executor, llm, error_classifier
     global config, context_engine
     global hermes_runtime, background_review_system, evolution_engine
@@ -403,7 +403,7 @@ async def init_rrclaw():
     global session_memory, user_memory, system_memory
     global evolve_command, research_command
 
-    logger.info("=== RRCLAW Unified Server Init ===")
+    logger.info("=== RRAgent Unified Server Init ===")
 
     # 0. Config
     config = RRClawConfig.from_file()
@@ -504,7 +504,7 @@ async def init_rrclaw():
     # Init default admin user
     await init_default_admin()
 
-    # 14. Heartbeat loop — register RRCLAW as orchestrator in Redis
+    # 14. Heartbeat loop — register RRAgent as orchestrator in Redis
     async def _heartbeat_loop():
         import redis.asyncio as aioredis
         r = aioredis.from_url(REDIS_URL, decode_responses=True)
@@ -525,31 +525,31 @@ async def init_rrclaw():
 
     asyncio.create_task(_heartbeat_loop())
 
-    logger.info("=== RRCLAW Init Complete ===")
+    logger.info("=== RRAgent Init Complete ===")
 
 
-async def shutdown_rrclaw():
-    """Shutdown RRCLAW components."""
-    logger.info("Shutting down RRCLAW...")
+async def shutdown_rragent():
+    """Shutdown RRAgent components."""
+    logger.info("Shutting down RRAgent...")
     if evolution_engine:
         await evolution_engine.stop()
     if hermes_runtime:
         hermes_runtime.shutdown()
     if pyagent_bridge:
         await pyagent_bridge.close()
-    logger.info("RRCLAW shutdown complete")
+    logger.info("RRAgent shutdown complete")
 
 
 # ── FastAPI App ──────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_rrclaw()
+    await init_rragent()
     yield
-    await shutdown_rrclaw()
+    await shutdown_rragent()
 
 
-app = FastAPI(title="RRCLAW Unified Server", docs_url=None, redoc_url=None, lifespan=lifespan)
+app = FastAPI(title="RRAgent Unified Server", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 
 # ── Auth Middleware ──────────────────────────────────────
@@ -758,7 +758,7 @@ async def api_chat(request: Request):
     uid = f"web_{user['sub']}" if user else "webchat_default"
     user_name = user.get("name", user.get("sub", "")) if user else ""
 
-    # If target is rrclaw / default manager, use ConversationRuntime
+    # If target is  rragent / default manager, use ConversationRuntime
     use_runtime = target in ("manager", "orchestrator", "rragent")
 
     if use_runtime and registry and llm:
@@ -947,7 +947,7 @@ async def api_command(request: Request):
         if cmd == "data_source_status":
             return json.dumps({"redis": "ok" if pyagent_bridge and pyagent_bridge.is_connected else "disconnected", "reachrich": "configured" if os.getenv("REACHRICH_TOKEN") else "not configured", "tools": len(registry.get_all_active_schemas()) if registry else 0}, ensure_ascii=False, indent=2)
         if cmd == "soul_check":
-            return "SOUL: RRCLAW ConversationRuntime active"
+            return "SOUL: RRAgent ConversationRuntime active"
         if cmd == "memory_health":
             return "Session: ok | User: ok | System: ok"
         if cmd == "memory_hygiene":
@@ -956,7 +956,7 @@ async def api_command(request: Request):
             stats = evolution_engine._stats if evolution_engine else {}
             t0 = len(registry.tier0_tools) if registry else 0
             t1 = len(registry.tier1_index) if registry else 0
-            return json.dumps({"runtime": "RRCLAW ConversationRuntime", "evolution": stats, "tools": {"tier0": t0, "tier1": t1}, "uptime": f"{time.time() - server_start_time:.0f}s"}, ensure_ascii=False, indent=2)
+            return json.dumps({"runtime": "RRAgent ConversationRuntime", "evolution": stats, "tools": {"tier0": t0, "tier1": t1}, "uptime": f"{time.time() - server_start_time:.0f}s"}, ensure_ascii=False, indent=2)
         return None
 
     local_result = _local_cmd(cmd)
@@ -1030,15 +1030,15 @@ async def api_overview():
         except Exception:
             channels[name] = {"status": "error", "age": -1, "fails": 0, "mode": ""}
 
-    # Add RRCLAW runtime info
-    rrclaw_info = {
+    # Add RRAgent runtime info
+    rragent_info = {
         "rragent": {
             "status": "online",
             "tools": registry.stats() if registry else {},
             "llm": llm.status().get("current", "unknown") if llm else "unavailable",
         }
     }
-    agents.update(rrclaw_info)
+    agents.update(rragent_info)
 
     return {"agents": agents, "channels": channels, "ts": time.time()}
 
@@ -1567,7 +1567,7 @@ async def api_strategy_delete(strategy_id: str, request: Request):
 
 @app.get("/api/usage")
 async def api_usage():
-    # Return RRCLAW session-level usage stats
+    # Return RRAgent session-level usage stats
     total_input = 0
     total_output = 0
     for sid, session in sessions.items():
@@ -1850,12 +1850,12 @@ async def api_monitor_silence(request: Request):
 
 @app.get("/api/reflect/stats")
 async def api_reflect_stats():
-    result = await send_to_orchestrator("reflect_stats", "", uid="rrclaw_api")
+    result = await send_to_orchestrator("reflect_stats", "", uid="rragent_api")
     return {"text": result}
 
 @app.get("/api/reflect/insight")
 async def api_reflect_insight():
-    result = await send_to_orchestrator("reflect", "", uid="rrclaw_api")
+    result = await send_to_orchestrator("reflect", "", uid="rragent_api")
     return {"text": result}
 
 
@@ -2083,14 +2083,14 @@ FRONTEND_PATH = Path(__file__).parent / "static" / "index.html"
 async def serve_frontend():
     if FRONTEND_PATH.exists():
         return FRONTEND_PATH.read_text(encoding="utf-8")
-    return "<h1>RRCLAW — Frontend not found. Place index.html in static/</h1>"
+    return "<h1>RRAgent — Frontend not found. Place index.html in static/</h1>"
 
 
 # ── Main ─────────────────────────────────────────────────
 
 def main():
     import uvicorn
-    logger.info(f"Starting RRCLAW Unified Server on {HOST}:{PORT}")
+    logger.info(f"Starting RRAgent Unified Server on {HOST}:{PORT}")
     uvicorn.run(app, host=HOST, port=PORT, log_level="info")
 
 

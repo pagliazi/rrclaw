@@ -1,15 +1,15 @@
 """
 ACP Runtime — Agent Communication Protocol external runtime.
 
-Implements the OpenClaw ACP protocol so RRCLAW can fully take over
+Implements the OpenClaw ACP protocol so RRAgent can fully take over
 the agent loop from the Gateway's embedded Pi runtime.
 
-Gateway → ACP WebSocket → RRCLAW ConversationRuntime
+Gateway → ACP WebSocket → RRAgent ConversationRuntime
                        ← streaming responses back
 
 ACP Protocol (v1):
 - Client (Gateway) sends: { type: "message", content: "...", sessionId: "..." }
-- Server (RRCLAW) streams: { type: "delta", text: "..." }
+- Server (RRAgent) streams: { type: "delta", text: "..." }
 - Server signals: { type: "tool_use", name: "...", input: {...} }
 - Server completes: { type: "done", usage: {...} }
 """

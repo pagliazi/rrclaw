@@ -23,7 +23,7 @@ function DashboardView({agents, channels, onViewChange, onSend}) {
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
-          <p className="text-sm text-zinc-500 mt-1">RRCLAW A股量化智能体</p>
+          <p className="text-sm text-zinc-500 mt-1">RRAgent A股量化智能体</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
@@ -77,12 +77,12 @@ function DashboardView({agents, channels, onViewChange, onSend}) {
         );
       })}
 
-      {/* RRCLAW Status + Quick Stats */}
+      {/* RRAgent Status + Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 animate-slide-up">
         <Card className="!p-4">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base">📊</span>
-            <h3 className="text-sm font-semibold text-zinc-200">RRCLAW</h3>
+            <h3 className="text-sm font-semibold text-zinc-200">RRAgent</h3>
           </div>
           <div className="space-y-1.5 text-[12px]">
             <div className="flex justify-between"><span className="text-zinc-500">ConversationRuntime</span><StatusDot status={agents.orchestrator && agents.orchestrator.status === 'online' ? 'online' : 'offline'} /></div>

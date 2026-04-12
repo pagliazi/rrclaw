@@ -1,7 +1,7 @@
 """
-MCP Server — expose RRCLAW tools via Model Context Protocol.
+MCP Server — expose RRAgent tools via Model Context Protocol.
 
-Allows Claude Desktop, Cursor, and other MCP clients to use RRCLAW tools.
+Allows Claude Desktop, Cursor, and other MCP clients to use RRAgent tools.
 Runs as a stdio MCP server launched by the host application.
 
 Usage:
@@ -23,7 +23,7 @@ logger = logging.getLogger("rragent.tools.mcp.server")
 
 class RRClawMCPServer:
     """
-    MCP Server exposing RRCLAW tools.
+    MCP Server exposing RRAgent tools.
 
     Two modes:
     1. PyAgent backend: exposes market/dev/backtest tools via Redis
@@ -232,7 +232,7 @@ class RRClawMCPServer:
 async def main():
     """Entry point for MCP server."""
     import argparse
-    parser = argparse.ArgumentParser(description="RRCLAW MCP Server")
+    parser = argparse.ArgumentParser(description="RRAgent MCP Server")
     parser.add_argument("--backend", default="pyagent", choices=["pyagent", "hermes", "all"])
     args = parser.parse_args()
 

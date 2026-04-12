@@ -25,7 +25,7 @@ from enum import Enum
 
 
 class TrustLevel(str, Enum):
-    BUNDLED = "bundled"          # Shipped with RRCLAW
+    BUNDLED = "bundled"          # Shipped with RRAgent
     AGENT_CREATED = "agent"      # Created by Background Review / Evolution
     HUB_INSTALLED = "hub"        # From ClawHub community
 

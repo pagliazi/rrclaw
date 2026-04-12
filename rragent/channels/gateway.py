@@ -2,7 +2,7 @@
 OpenClaw Gateway Channel — WebSocket connection using v3 protocol.
 
 Refactored from bridge/gateway_client.py to work with ConversationRuntime.
-Gateway is now a pure channel layer; RRCLAW controls the LLM loop.
+Gateway is now a pure channel layer; RRAgent controls the LLM loop.
 
 v3 protocol handshake:
 1. Receive `connect.challenge` event with nonce
@@ -29,7 +29,7 @@ class GatewayChannel:
     WebSocket client for OpenClaw Gateway (v3 protocol).
 
     In the new architecture, Gateway only routes messages.
-    RRCLAW's ConversationRuntime handles all agent logic.
+    RRAgent's ConversationRuntime handles all agent logic.
     """
 
     def __init__(

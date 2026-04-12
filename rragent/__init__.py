@@ -1,5 +1,5 @@
 """
-RRCLAW — Unified Agent Harness for ReachRich + OpenClaw.
+RRAgent — Unified Agent Harness for ReachRich + OpenClaw.
 
 Controls the LLM loop, tool execution, context compression,
 fault tolerance, and self-learning evolution.

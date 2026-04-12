@@ -2,7 +2,7 @@
 ReachRich real-time data stream end-to-end test.
 
 Simulates the full flow:
-  ReachRich data_factory/FastAPI → Redis PUBLISH → RRCLAW StreamConsumer → handler
+  ReachRich data_factory/FastAPI → Redis PUBLISH → RRAgent StreamConsumer → handler
 
 Tests:
   1. Unsigned messages (data_factory default format) — should be accepted

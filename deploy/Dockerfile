@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir ".[full]"
 
 COPY . .
 
-CMD ["python", "-m", "rrclaw", "--config", "rrclaw.yaml"]
+CMD ["python", "-m", "rragent", "--config", "rragent.yaml"]

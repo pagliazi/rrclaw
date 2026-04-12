@@ -30,7 +30,7 @@ GATEWAY_URL = os.getenv("GATEWAY_URL", "ws://127.0.0.1:18789")
 GATEWAY_TOKEN = os.getenv("GATEWAY_TOKEN", "")
 REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 
-SYSTEM_PROMPT = """你是 RRCLAW 量化分析助手，专注于 A 股市场。
+SYSTEM_PROMPT = """你是 RRAgent 量化分析助手，专注于 A 股市场。
 你有以下工具可用：
 - pyagent_market_data: 获取全市场行情数据（涨停板、板块概念、热门股票）
 - pyagent_analysis_ask: 让分析 Agent 回答市场分析问题
@@ -118,7 +118,7 @@ async def handle_user_message(session_id: str, text: str):
 async def main():
     global pyagent_bridge, registry, executor, llm, gateway
 
-    logger.info("=== RRCLAW P0 启动 ===")
+    logger.info("=== RRAgent P0 启动 ===")
 
     # 1. PyAgent bridge
     pyagent_bridge = PyAgentBridge(redis_url=REDIS_URL)
@@ -185,7 +185,7 @@ async def main():
         logger.info("No GATEWAY_TOKEN — running standalone (stdin mode)")
 
     # 6. Stdin mode (for testing without Gateway)
-    logger.info("\n=== RRCLAW Ready. Type messages below (Ctrl+C to quit) ===\n")
+    logger.info("\n=== RRAgent Ready. Type messages below (Ctrl+C to quit) ===\n")
 
     loop = asyncio.get_event_loop()
     try:

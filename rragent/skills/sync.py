@@ -2,7 +2,7 @@
 Skill Sync — bidirectional skill synchronization.
 
 Syncs skills between:
-- RRCLAW local (~/.rragent/skills/)
+- RRAgent local (~/.rragent/skills/)
 - OpenClaw workspace (~/.rragent/workspace/skills/)
 - Hermes skills store (if available)
 
@@ -24,9 +24,9 @@ class SkillSync:
     Bidirectional skill synchronization.
 
     Strategy:
-    - Source of truth: ~/.rragent/skills/ (RRCLAW creates skills here)
+    - Source of truth: ~/.rragent/skills/ (RRAgent creates skills here)
     - Mirrors: OpenClaw workspace, Hermes store
-    - Sync direction: RRCLAW -> mirrors (one-way for auto-created)
+    - Sync direction: RRAgent -> mirrors (one-way for auto-created)
     - Manual skills from mirrors are imported on demand
 
     Conflict resolution: newer file wins (by mtime).
@@ -34,11 +34,11 @@ class SkillSync:
 
     def __init__(
         self,
-        rrclaw_dir: str | Path | None = None,
+        rragent_dir: str | Path | None = None,
         openclaw_dir: str | Path | None = None,
         hermes_dir: str | Path | None = None,
     ):
-        self.rragent_dir = Path(rrclaw_dir) if rrclaw_dir else Path.home() / ".rragent" / "skills"
+        self.rragent_dir = Path(rragent_dir) if rragent_dir else Path.home() / ".rragent" / "skills"
         self.openclaw_dir = (
             Path(openclaw_dir) if openclaw_dir
             else Path.home() / ".openclaw" / "workspace" / "skills"
@@ -70,7 +70,7 @@ class SkillSync:
         return self._import_from_dir(self.hermes_dir)
 
     def _sync_to_dir(self, target_dir: Path) -> int:
-        """Copy new/updated skills from RRCLAW to target directory."""
+        """Copy new/updated skills from RRAgent to target directory."""
         if not target_dir.parent.exists():
             return 0
 

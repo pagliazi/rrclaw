@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# RRCLAW 一键部署脚本
+# RRAgent 一键部署脚本
 # Usage: ./deploy.sh [--with-docker]
 # ============================================================================
 
@@ -57,7 +57,7 @@ echo " | |_) | |_) | |   | |     / _ \\ \\ /\\ / / "
 echo " |  _ <|  _ <| |___| |___ / ___ \\ V  V /  "
 echo " |_| \\_\\_| \\_\\\\____|_____/_/   \\_\\_/\\_/   "
 echo ""
-echo "  A股多智能体量化交易系统 - 一键部署"
+echo "  A股量化智能体 - 一键部署"
 echo -e "${NC}"
 
 # ============================================================================
@@ -172,12 +172,12 @@ success "依赖安装完成"
 # ── 第4步:生成配置文件 ──
 step "生成配置文件"
 
-if [ -f rrclaw.yaml ]; then
-    info "rrclaw.yaml 已存在,保留现有配置"
+if [ -f rragent.yaml ]; then
+    info "rragent.yaml 已存在,保留现有配置"
 else
     if [ -f config.example.yaml ]; then
-        cp config.example.yaml rrclaw.yaml
-        success "已生成 rrclaw.yaml"
+        cp config.example.yaml rragent.yaml
+        success "已生成 rragent.yaml"
     else
         warn "未找到 config.example.yaml,跳过"
     fi
@@ -257,7 +257,7 @@ fi
 FINAL_ANTHROPIC=$(get_env_val "ANTHROPIC_API_KEY")
 FINAL_DASHSCOPE=$(get_env_val "DASHSCOPE_API_KEY")
 if [ -z "$FINAL_ANTHROPIC" ] && [ -z "$FINAL_DASHSCOPE" ]; then
-    warn "未配置任何 LLM API Key,RRCLAW 将无法调用大模型"
+    warn "未配置任何 LLM API Key,RRAgent 将无法调用大模型"
     warn "运行后请在 .env 中填入 ANTHROPIC_API_KEY 或 DASHSCOPE_API_KEY"
 fi
 
@@ -357,7 +357,7 @@ fi
 # ── 完成 ──
 echo ""
 echo -e "${GREEN}${BOLD}============================================${NC}"
-echo -e "${GREEN}${BOLD}  RRCLAW 部署完成！${NC}"
+echo -e "${GREEN}${BOLD}  RRAgent 部署完成！${NC}"
 echo -e "${GREEN}${BOLD}============================================${NC}"
 echo ""
 echo -e "  ${BOLD}启动步骤:${NC}"
@@ -368,16 +368,16 @@ echo ""
 echo -e "  2. 激活虚拟环境:"
 echo -e "     ${CYAN}source .venv/bin/activate${NC}"
 echo ""
-echo -e "  3. 启动 RRCLAW:"
-echo -e "     ${CYAN}python -m rrclaw --config rrclaw.yaml${NC}"
+echo -e "  3. 启动 RRAgent:"
+echo -e "     ${CYAN}python -m rragent --config rragent.yaml${NC}"
 echo ""
 echo -e "  ${BOLD}其他启动方式:${NC}"
-echo -e "     ${CYAN}rrclaw-mcp --backend pyagent${NC}     # MCP 服务(PyAgent 工具)"
-echo -e "     ${CYAN}rrclaw-market${NC}                     # MCP 服务(行情数据)"
+echo -e "     ${CYAN}rragent-mcp --backend pyagent${NC}     # MCP 服务(PyAgent 工具)"
+echo -e "     ${CYAN}rragent-market${NC}                     # MCP 服务(行情数据)"
 echo ""
 echo -e "  ${BOLD}配置文件:${NC}"
 echo -e "     .env          — 环境变量(API Key 等敏感信息)"
-echo -e "     rrclaw.yaml   — 系统配置(模型、超时等)"
+echo -e "     rragent.yaml   — 系统配置(模型、超时等)"
 echo ""
 echo -e "  ${BOLD}可选组件(接入 IM 通道时需要):${NC}"
 echo -e "     OpenClaw Gateway — Telegram/飞书/WebChat 接入"

@@ -2,7 +2,7 @@
 ReachRich MCP Server — expose A-share market data via MCP protocol.
 
 Only wraps fast query operations suitable for MCP (request-response).
-Long-running operations (backtest, factor mining) stay as native RRCLAW tools.
+Long-running operations (backtest, factor mining) stay as native RRAgent tools.
 Real-time streaming uses Redis Pub/Sub subscription (see data_sources/).
 
 Tool schemas match BridgeClient's actual method signatures:
@@ -229,11 +229,11 @@ class ReachRichMCPServer:
         """Initialize BridgeClient with configuration.
 
         BridgeClient supports dual auth: token (user) or secret (internal).
-        RRCLAW users only need REACHRICH_TOKEN — no server secret required.
+        RRAgent users only need REACHRICH_TOKEN — no server secret required.
 
         Config sources (highest priority last):
           1. BridgeClient defaults (env vars BRIDGE_BASE_URL / REACHRICH_TOKEN)
-          2. RRCLAW config (reachrich.base_url / reachrich.token)
+          2. RRAgent config (reachrich.base_url / reachrich.token)
           3. Environment overrides (REACHRICH_URL / REACHRICH_TOKEN)
         """
         try:
@@ -282,7 +282,7 @@ class ReachRichMCPServer:
                 "result": {
                     "protocolVersion": "2024-11-05",
                     "capabilities": {"tools": {"listChanged": False}},
-                    "serverInfo": {"name": "rrclaw-market", "version": "0.2.0"},
+                    "serverInfo": {"name": "rragent-market", "version": "0.2.0"},
                 },
             }
 

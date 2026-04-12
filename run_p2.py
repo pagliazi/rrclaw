@@ -189,7 +189,7 @@ async def main():
     global pyagent_bridge, registry, executor, llm, error_classifier
     global gateway, config, context_engine
 
-    logger.info("=== RRCLAW P2 启动 (Fault Tolerance) ===")
+    logger.info("=== RRAgent P2 启动 (Fault Tolerance) ===")
 
     # 0. Load config
     config = RRClawConfig.from_file()
@@ -261,7 +261,7 @@ async def main():
         logger.info("No GATEWAY_TOKEN — running standalone (stdin mode)")
 
     # 8. Stdin mode (for testing)
-    logger.info("\n=== RRCLAW P2 Ready. Type messages below (Ctrl+C to quit) ===\n")
+    logger.info("\n=== RRAgent P2 Ready. Type messages below (Ctrl+C to quit) ===\n")
 
     loop = asyncio.get_event_loop()
     try:

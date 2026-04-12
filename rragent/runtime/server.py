@@ -1,5 +1,5 @@
 """
-RRCLAW Server — Main entry point.
+RRAgent Server — Main entry point.
 
 Orchestrates all harness components:
 1. Loads configuration
@@ -35,7 +35,7 @@ logger = logging.getLogger("rragent.server")
 
 
 class RRClawServer:
-    """Main RRCLAW harness server."""
+    """Main RRAgent harness server."""
 
     def __init__(self, config: RRClawConfig):
         self.config = config
@@ -56,7 +56,7 @@ class RRClawServer:
 
     async def start(self):
         """Initialize all components and start the server."""
-        logger.info("RRCLAW Harness starting...")
+        logger.info("RRAgent Harness starting...")
 
         # 1. Tool registry
         self.registry = GlobalToolRegistry()
@@ -114,7 +114,7 @@ class RRClawServer:
             )
 
         logger.info(
-            f"RRCLAW Harness ready. "
+            f"RRAgent Harness ready. "
             f"Tools: {self.registry.stats()}"
         )
 
@@ -258,7 +258,7 @@ class RRClawServer:
             return self._default_system_prompt()
 
     def _default_system_prompt(self) -> str:
-        return """你是 RRCLAW，一个统一的A股量化分析和多功能智能助手。
+        return """你是 RRAgent，一个统一的A股量化分析和多功能智能助手。
 
 你可以：
 - 查询市场行情（涨停板、连板、板块、热门股）
@@ -352,7 +352,7 @@ class RRClawServer:
 
     async def shutdown(self):
         """Graceful shutdown."""
-        logger.info("RRCLAW shutting down...")
+        logger.info("RRAgent shutting down...")
 
         # Stop real-time stream consumer
         if self.stream_consumer:
@@ -367,14 +367,14 @@ class RRClawServer:
         if self.pyagent_bridge:
             await self.pyagent_bridge.close()
 
-        logger.info("RRCLAW shutdown complete")
+        logger.info("RRAgent shutdown complete")
 
     def request_shutdown(self):
         self._shutdown_event.set()
 
 
 def main():
-    parser = argparse.ArgumentParser(description="RRCLAW Harness Server")
+    parser = argparse.ArgumentParser(description="RRAgent Harness Server")
     parser.add_argument("--config", default=None, help="Path to config YAML")
     args = parser.parse_args()
 

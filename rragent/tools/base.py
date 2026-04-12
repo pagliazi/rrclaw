@@ -59,7 +59,7 @@ class ToolUse:
 
 
 class Tool(ABC):
-    """Base class for all RRCLAW tools."""
+    """Base class for all RRAgent tools."""
 
     spec: ToolSpec
 

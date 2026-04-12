@@ -1,5 +1,5 @@
 """
-Anthropic LLM Provider — primary provider for RRCLAW.
+Anthropic LLM Provider — primary provider for RRAgent.
 """
 
 from __future__ import annotations

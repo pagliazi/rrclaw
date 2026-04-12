@@ -2,8 +2,8 @@
 Integration tests for IM (Gateway/Telegram) and Web (ACP/WebChat) channels.
 
 Tests the full message flow:
-1. Mock Gateway WS server → RRCLAW GatewayChannel → ConversationRuntime → response
-2. WebSocket client → RRCLAW ACPRuntime → ConversationRuntime → streaming response
+1. Mock Gateway WS server → RRAgent GatewayChannel → ConversationRuntime → response
+2. WebSocket client → RRAgent ACPRuntime → ConversationRuntime → streaming response
 """
 
 from __future__ import annotations
@@ -146,9 +146,9 @@ def create_test_server():
 async def test_im_gateway():
     """
     Simulate Telegram message flow:
-    User (Telegram) → OpenClaw Gateway → RRCLAW GatewayChannel → ConversationRuntime → response
+    User (Telegram) → OpenClaw Gateway → RRAgent GatewayChannel → ConversationRuntime → response
 
-    We create a mock Gateway WS server, then connect RRCLAW's GatewayChannel to it.
+    We create a mock Gateway WS server, then connect RRAgent's GatewayChannel to it.
     """
     print("\n" + "=" * 60)
     print("  Test IM: Gateway (Telegram/IM) Channel")
@@ -161,7 +161,7 @@ async def test_im_gateway():
     # ── Mock OpenClaw Gateway WS Server ──
     async def mock_gateway_handler(ws, path=""):
         """Simulate OpenClaw Gateway behavior."""
-        # 1. Expect channel.register from RRCLAW
+        # 1. Expect channel.register from RRAgent
         raw = await asyncio.wait_for(ws.recv(), timeout=5)
         reg = json.loads(raw)
         assert reg["type"] == "channel.register", f"Expected register, got {reg['type']}"
@@ -204,11 +204,11 @@ async def test_im_gateway():
     # Start mock gateway
     mock_server = await websockets.serve(mock_gateway_handler, "127.0.0.1", gateway_port)
 
-    # ── RRCLAW side ──
+    # ── RRAgent side ──
     test_server = create_test_server()
 
     async def handle_user_message(session_id, prompt, context=None, metadata=None):
-        """RRCLAW message handler — same as RRClawServer._handle_user_message."""
+        """RRAgent message handler — same as RRClawServer._handle_user_message."""
         runtime = test_server._get_or_create_runtime(session_id)
         full_response = ""
         async for event in runtime.run_turn(prompt):
@@ -272,9 +272,9 @@ async def test_im_gateway():
 async def test_web_acp():
     """
     Simulate WebChat flow:
-    Browser → ACP WebSocket → RRCLAW ConversationRuntime → streaming response
+    Browser → ACP WebSocket → RRAgent ConversationRuntime → streaming response
 
-    We start RRCLAW's ACP server and connect a mock WebSocket client to it.
+    We start RRAgent's ACP server and connect a mock WebSocket client to it.
     """
     print("\n" + "=" * 60)
     print("  Test Web: ACP (WebChat) Channel")
@@ -454,7 +454,7 @@ async def test_concurrent_sessions():
 
 async def run_all():
     print("\n" + "═" * 60)
-    print("  RRCLAW Channel Integration Tests")
+    print("  RRAgent Channel Integration Tests")
     print("  IM (Gateway/Telegram) + Web (ACP/WebChat)")
     print("═" * 60)
 
